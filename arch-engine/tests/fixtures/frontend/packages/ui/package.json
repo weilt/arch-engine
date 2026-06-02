@@ -1,0 +1,7 @@
+{
+  "name": "@demo/ui",
+  "description": "Demo UI component library",
+  "dependencies": {
+    "react": "^18.0.0"
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "embedding": {
+    "baseUrl": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+    "apiKeyEnv": "DASHSCOPE_API_KEY",
+    "model": "text-embedding-v3"
+  },
+  "chunking": {
+    "baseUrl": "https://your-maas-endpoint/v1",
+    "apiKeyEnv": "XF_MAAS_API_KEY",
+    "chatModel": "astron-code-latest",
+    "maxChunkTokens": 8000,
+    "strategy": "semantic-only"
+  },
+  "apiSpecGlobs": [
+    "docs/**/*.json",
+    "**/openapi.json",
+    "**/swagger.json",
+    "**/swagger.yaml",
+    "**/apifox/**/*.json",
+    "apifox-export/**/*.json"
+  ],
+  "scanners": {
+    "java": true,
+    "frontend": true
+  }
+}

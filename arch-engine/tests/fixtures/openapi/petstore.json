@@ -1,0 +1,28 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Pet Store",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/pets": {
+      "get": {
+        "summary": "List pets",
+        "tags": ["pets"],
+        "operationId": "listPets"
+      },
+      "post": {
+        "summary": "Create pet",
+        "tags": ["pets"],
+        "operationId": "createPet"
+      }
+    },
+    "/pets/{petId}": {
+      "get": {
+        "summary": "Get pet by ID",
+        "tags": ["pets"],
+        "operationId": "getPet"
+      }
+    }
+  }
+}

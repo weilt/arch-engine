@@ -1,0 +1,8 @@
+# 复制到你的项目 .gitignore（agent-init / start-init 之后）
+
+# APT 本地密钥（勿提交）
+.ai/arch/arch.secrets.json
+
+# 可选：若 apiKey 写在 arch.config.json 里，也建议忽略整个 arch 目录的生成物
+# .ai/arch/vectors.db
+# .ai/arch/arch-index.json

@@ -1,0 +1,25 @@
+{
+  "data": {
+    "openapi": "3.0.0",
+    "info": {
+      "title": "Apifox Export",
+      "version": "1.0.0"
+    },
+    "paths": {
+      "/users": {
+        "get": {
+          "summary": "List users",
+          "tags": ["users"],
+          "operationId": "listUsers"
+        }
+      },
+      "/internal/health": {
+        "get": {
+          "summary": "Health check",
+          "tags": ["internal"],
+          "operationId": "healthCheck"
+        }
+      }
+    }
+  }
+}
