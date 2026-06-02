@@ -274,8 +274,10 @@ export async function splitOversizedChunks(
   config: ArchConfig,
   chunks: SemanticSplitChunk[],
   maxTokens: number,
-  context: { path: string; kind: string }
+  context: { path: string; kind: string },
+  depth = 0
 ): Promise<SemanticSplitChunk[]> {
+  const MAX_DEPTH = 5;
   const result: SemanticSplitChunk[] = [];
 
   for (const chunk of chunks) {
@@ -285,11 +287,24 @@ export async function splitOversizedChunks(
       continue;
     }
 
+    if (depth >= MAX_DEPTH) {
+      archLog.warn("semantic split: max recursion depth reached, keeping oversized chunk", {
+        path: context.path,
+        title: chunk.title,
+        tokens,
+        maxTokens,
+        depth,
+      });
+      result.push(chunk);
+      continue;
+    }
+
     archLog.info("semantic split: chunk exceeds max tokens, subdividing", {
       path: context.path,
       title: chunk.title,
       tokens,
       maxTokens,
+      depth,
     });
 
     const subChunks = await callSemanticSplit(config, chunk.text, context);
@@ -297,7 +312,8 @@ export async function splitOversizedChunks(
       config,
       subChunks,
       maxTokens,
-      context
+      context,
+      depth + 1
     );
     result.push(...resized);
   }

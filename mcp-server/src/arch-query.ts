@@ -94,7 +94,12 @@ export async function handleSearchArch(
   limit = 5,
   filter?: { kind?: string }
 ) {
-  const { config } = await loadOrInitConfig(projectRoot);
+  const { config, created } = await loadOrInitConfig(projectRoot);
+  if (created) {
+    throw new Error(
+      "❌ arch.config.json not found. Run start-init first to scan and index this project."
+    );
+  }
   const embedding = await embedQuery(config, query);
   const store = new VectorStore(getVectorsDbPath(projectRoot));
   try {

@@ -3,7 +3,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 import fs from "node:fs/promises";
-import { appendContract, appendMissing, findContract, readDb } from "./db.js";
+import { appendMissing, findContract, readDb, upsertContract } from "./db.js";
 import { getProjectRoot, resolveTsPath } from "./paths.js";
 import { regenerateIndexMd } from "./index-md.js";
 import { handleQueryArch, handleSearchArch } from "./arch-query.js";
@@ -94,7 +94,7 @@ server.tool(
         };
       }
 
-      await appendContract(projectRoot, {
+      const { updated } = await upsertContract(projectRoot, {
         name,
         description,
         tsFilePath,
@@ -106,7 +106,9 @@ server.tool(
         content: [
           {
             type: "text" as const,
-            text: "✅ Contract registered and INDEX.md updated.",
+            text: updated
+              ? "✅ Contract updated and INDEX.md refreshed."
+              : "✅ Contract registered and INDEX.md updated.",
           },
         ],
       };

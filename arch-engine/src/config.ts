@@ -53,13 +53,26 @@ async function loadSecretsOverlay(projectRoot: string): Promise<ArchSecretsParti
   }
 }
 
+function assertValidConfig(data: unknown): ArchConfig {
+  const c = data as Record<string, unknown>;
+  const e = c.embedding as Record<string, unknown> | undefined;
+  const k = c.chunking as Record<string, unknown> | undefined;
+  if (!e?.baseUrl || !e?.model || !k?.baseUrl || !k?.chatModel) {
+    throw new Error(
+      "Invalid arch.config.json: missing required fields " +
+        "(embedding.baseUrl, embedding.model, chunking.baseUrl, chunking.chatModel)"
+    );
+  }
+  return data as ArchConfig;
+}
+
 export async function loadOrInitConfig(
   projectRoot: string
 ): Promise<{ config: ArchConfig; created: boolean }> {
   const p = getArchConfigPath(projectRoot);
   try {
     const raw = await fs.readFile(p, "utf-8");
-    let config = JSON.parse(raw) as ArchConfig;
+    let config = assertValidConfig(JSON.parse(raw));
     const secrets = await loadSecretsOverlay(projectRoot);
     if (secrets) config = mergeSecrets(config, secrets);
     return { config, created: false };

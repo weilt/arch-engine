@@ -77,6 +77,23 @@ export async function appendContract(
   await writeDb(projectRoot, db);
 }
 
+/** Insert or update a contract by name. Returns { updated: true } when an existing entry was replaced. */
+export async function upsertContract(
+  projectRoot: string,
+  contract: Contract
+): Promise<{ updated: boolean }> {
+  const db = await readDb(projectRoot);
+  const idx = db.contracts.findIndex((c) => c.name === contract.name);
+  if (idx >= 0) {
+    db.contracts[idx] = contract;
+    await writeDb(projectRoot, db);
+    return { updated: true };
+  }
+  db.contracts.push(contract);
+  await writeDb(projectRoot, db);
+  return { updated: false };
+}
+
 export async function appendMissing(
   projectRoot: string,
   req: MissingRequest
