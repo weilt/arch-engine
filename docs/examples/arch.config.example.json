@@ -9,7 +9,14 @@
     "apiKeyEnv": "XF_MAAS_API_KEY",
     "chatModel": "astron-code-latest",
     "maxChunkTokens": 8000,
-    "strategy": "semantic-only"
+    "strategy": "semantic-only",
+    "summarizeBatchSize": 8,
+    "summarizeMaxRetries": 3,
+    "summarizeRetryBaseDelayMs": 1000,
+    "maxSignaturesPerCandidate": 12,
+    "summarizeMaxTokens": 4096,
+    "summarizeBatchDelayMs": 300,
+    "summarizeJsonMode": false
   },
   "apiSpecGlobs": [
     "docs/**/*.json",
@@ -22,5 +29,9 @@
   "scanners": {
     "java": true,
     "frontend": true
-  }
+  },
+  "designSystemPackages": [
+    "@*/ui",
+    "@org/design-system"
+  ]
 }

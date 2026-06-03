@@ -21,7 +21,8 @@ function isConfigError(message: string): boolean {
 
 async function main(): Promise<void> {
   const root = process.cwd();
-  const report = await runStartInit(root);
+  const full = process.argv.includes("--full");
+  const report = await runStartInit(root, {}, { full });
 
   if (report.status === "config-created") {
     console.log(

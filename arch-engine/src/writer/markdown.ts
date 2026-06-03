@@ -1,7 +1,8 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { getArchDir } from "../paths.js";
-import type { ApiEndpoint, DocumentModel, FrontendPackage, RpcEndpoint } from "../types.js";
+import type { ApiEndpoint, DocumentModel, FrontendPackage, FrontendSymbol, RpcEndpoint } from "../types.js";
+import { groupAssetCardsByModule, writeModuleAssetDocs } from "./asset-md.js";
 
 function renderModuleOverview(name: string, modulePath: string): string {
   return `# ${name}
@@ -59,6 +60,25 @@ function renderPackageOverview(pkg: FrontendPackage): string {
   return lines.join("\n").trimEnd() + "\n";
 }
 
+function renderSymbolSection(symbol: FrontendSymbol): string[] {
+  const lines = [`## ${symbol.name}`, ""];
+  if (symbol.description) {
+    lines.push(symbol.description);
+    lines.push("");
+  }
+  lines.push(`File: \`${symbol.file}\``);
+  lines.push("");
+  if (symbol.exports.length > 0) {
+    lines.push("Exports:");
+    lines.push("");
+    for (const exp of symbol.exports) {
+      lines.push(`- \`${exp}\``);
+    }
+    lines.push("");
+  }
+  return lines;
+}
+
 function renderComponentsMd(pkg: FrontendPackage): string {
   const lines = ["# Components", ""];
   if (pkg.components.length === 0) {
@@ -67,10 +87,7 @@ function renderComponentsMd(pkg: FrontendPackage): string {
     return lines.join("\n");
   }
   for (const c of pkg.components) {
-    lines.push(`## ${c.name}`);
-    lines.push("");
-    lines.push(`File: \`${c.file}\``);
-    lines.push("");
+    lines.push(...renderSymbolSection(c));
   }
   return lines.join("\n").trimEnd() + "\n";
 }
@@ -83,10 +100,31 @@ function renderUtilsMd(pkg: FrontendPackage): string {
     return lines.join("\n");
   }
   for (const u of pkg.utils) {
-    lines.push(`## ${u.name}`);
+    lines.push(...renderSymbolSection(u));
+  }
+  return lines.join("\n").trimEnd() + "\n";
+}
+
+function renderEnumsMd(pkg: FrontendPackage): string {
+  const lines = ["# Enums", ""];
+  if (pkg.enums.length === 0) {
+    lines.push("_No shared enums discovered._");
     lines.push("");
-    lines.push(`File: \`${u.file}\``);
+    return lines.join("\n");
+  }
+  for (const e of pkg.enums) {
+    lines.push(`## ${e.name}`);
     lines.push("");
+    if (e.description) {
+      lines.push(e.description);
+      lines.push("");
+    }
+    lines.push(`File: \`${e.file}\``);
+    lines.push("");
+    if (e.members.length > 0) {
+      lines.push(`Members: ${e.members.join(", ")}`);
+      lines.push("");
+    }
   }
   return lines.join("\n").trimEnd() + "\n";
 }
@@ -115,6 +153,13 @@ export async function writeMarkdownTree(
     await writeFileEnsuringDir(path.join(modDir, "rpc.md"), renderRpcMd(moduleRpcs));
   }
 
+  if (model.assetCards && model.assetCards.length > 0) {
+    const byModule = groupAssetCardsByModule(model.assetCards);
+    for (const [moduleSlug, cards] of Object.entries(byModule)) {
+      await writeModuleAssetDocs(projectRoot, moduleSlug, cards);
+    }
+  }
+
   for (const pkg of model.packages) {
     const pkgDir = path.join(archDir, "frontend", pkg.slug);
     await writeFileEnsuringDir(
@@ -126,5 +171,6 @@ export async function writeMarkdownTree(
       renderComponentsMd(pkg)
     );
     await writeFileEnsuringDir(path.join(pkgDir, "utils.md"), renderUtilsMd(pkg));
+    await writeFileEnsuringDir(path.join(pkgDir, "enums.md"), renderEnumsMd(pkg));
   }
 }

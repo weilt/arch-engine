@@ -2,6 +2,13 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import fg from "fast-glob";
 import type { ApiEndpoint, JavaModule, RpcEndpoint } from "../types.js";
+import { parseFeignInterface } from "./java-feign.js";
+
+export { discoverJavaCandidates } from "./java-assets.js";
+export {
+  discoverJavaStarterCandidates,
+  isStarterModule,
+} from "./java-starter.js";
 
 const MODULE_POM = "**/pom.xml";
 
@@ -21,7 +28,19 @@ export async function findMavenModules(projectRoot: string): Promise<JavaModule[
 const MAPPING_RE =
   /@(Get|Post|Put|Patch|Delete)Mapping\s*\(\s*(?:value\s*=\s*)?["']([^"']+)["']/g;
 const CLASS_MAPPING_RE = /@RequestMapping\s*\(\s*(?:value\s*=\s*)?["']([^"']+)["']/;
-const FEIGN_RE = /@FeignClient\s*\(\s*(?:value\s*=\s*)?["']([^"']+)["']/g;
+
+function buildRpcSummary(feign: ReturnType<typeof parseFeignInterface>): string {
+  if (!feign) return "";
+  const firstOp = feign.methods.find((m) => m.operationSummary)?.operationSummary;
+  if (firstOp) {
+    return `Feign ${feign.name} (${feign.clientRef}): ${firstOp}`;
+  }
+  if (feign.methods.length > 0) {
+    const m = feign.methods[0];
+    return `Feign ${feign.name} (${feign.clientRef}): ${m.httpMethod ?? "RPC"} ${m.path ?? ""}`.trim();
+  }
+  return `Feign client ${feign.name} (${feign.clientRef})`;
+}
 
 export async function scanJavaSources(
   projectRoot: string,
@@ -29,6 +48,8 @@ export async function scanJavaSources(
 ): Promise<{ apis: ApiEndpoint[]; rpcs: RpcEndpoint[] }> {
   const apis: ApiEndpoint[] = [];
   const rpcs: RpcEndpoint[] = [];
+  const seenRpc = new Set<string>();
+
   for (const mod of modules) {
     const javaFiles = await fg.glob("**/*.java", {
       cwd: path.join(projectRoot, mod.path),
@@ -38,11 +59,13 @@ export async function scanJavaSources(
     for (const file of javaFiles) {
       const content = await fs.readFile(file, "utf-8");
       if (content.includes("@FeignClient")) {
-        for (const m of content.matchAll(FEIGN_RE)) {
+        const feign = parseFeignInterface(content);
+        if (feign && !seenRpc.has(`${mod.slug}:${feign.name}`)) {
+          seenRpc.add(`${mod.slug}:${feign.name}`);
           rpcs.push({
-            id: `feign-${m[1]}`,
-            name: m[1],
-            summary: `Feign client ${m[1]}`,
+            id: `feign-${feign.name}`,
+            name: feign.name,
+            summary: buildRpcSummary(feign),
             moduleSlug: mod.slug,
             source: "java",
           });

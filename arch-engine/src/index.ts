@@ -45,6 +45,22 @@ export {
 
 export { VectorStore, type SearchHit } from "./vector/sqlite-store.js";
 
+export { buildAssetId } from "./asset/id.js";
+export { assetCardToChunkText } from "./asset/chunk-text.js";
+export {
+  writeModuleAssetDocs,
+  upsertAssetCardInModuleDoc,
+  upsertAssetSectionInMarkdown,
+} from "./writer/asset-md.js";
+
+export {
+  registerAssetInArch,
+  inferAssetScope,
+  patchArchIndexForAsset,
+  type RegisterAssetInput,
+  type RegisterAssetResult,
+} from "./register-asset.js";
+
 export {
   chunkStructuredEntities,
   callSemanticSplit,
@@ -58,6 +74,10 @@ export { embedTexts, embedQuery } from "./embedding/openai-compatible.js";
 
 export {
   cleanArchDir,
+  runModuleBatch,
   runStartInit,
+  type ModuleBatchResult,
+  type PipelineDeps,
+  type PipelineOptions,
   type StartInitReport,
 } from "./pipeline.js";

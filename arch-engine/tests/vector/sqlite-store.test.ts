@@ -62,6 +62,31 @@ describe("VectorStore", () => {
     expect(hits[0]!.path).toBe("path/new");
   });
 
+  it("upsertChunks replaces row with same id", () => {
+    store = new VectorStore(dbPath);
+    const assetId = "backend/demo/util/JsonUtils";
+    store.upsertChunks([
+      {
+        meta: chunk(assetId, "backend/demo/util", "util", "First"),
+        embedding: [1, 0],
+        sourcePath: "src/First.java",
+      },
+    ]);
+    store.upsertChunks([
+      {
+        meta: chunk(assetId, "backend/demo/util", "util", "FirstUpdated"),
+        embedding: [0, 1],
+        sourcePath: "src/FirstV2.java",
+      },
+    ]);
+
+    const hits = store.search([0, 1], 5);
+    expect(hits).toHaveLength(1);
+    expect(hits[0]!.summary).toBe("Summary for FirstUpdated");
+    expect(hits[0]!.sourcePath).toBe("src/FirstV2.java");
+    expect(hits[0]!.assetId).toBe(assetId);
+  });
+
   it("filters by kind when provided", () => {
     store = new VectorStore(dbPath);
     store.insert([
@@ -72,5 +97,53 @@ describe("VectorStore", () => {
     const hits = store.search([1, 0, 0], 5, "api");
     expect(hits).toHaveLength(1);
     expect(hits[0]!.kind).toBe("api");
+  });
+
+  it("upsertChunks replaces rows with the same id", () => {
+    store = new VectorStore(dbPath);
+    const meta = chunk("backend/base-common/util/JsonUtils", "backend/base-common/util", "util", "JsonUtils");
+    store.upsertChunks([{ meta, embedding: [1, 0, 0] }]);
+    store.upsertChunks([
+      {
+        meta: { ...meta, text: "Updated summary" },
+        embedding: [0, 1, 0],
+      },
+    ]);
+
+    const hits = store.search([0, 1, 0], 5);
+    expect(hits).toHaveLength(1);
+    expect(hits[0]!.summary).toBe("Updated summary");
+  });
+
+  it("deleteByIds removes specific chunks", () => {
+    store = new VectorStore(dbPath);
+    store.upsertChunks([
+      { meta: chunk("a", "backend/a", "api", "A"), embedding: [1, 0] },
+      { meta: chunk("b", "backend/b", "api", "B"), embedding: [0, 1] },
+    ]);
+    store.deleteByIds(["a"]);
+
+    const afterDelete = store.search([1, 0], 5);
+    expect(afterDelete.every((h) => h.path !== "backend/a")).toBe(true);
+    expect(store.search([0, 1], 5)[0]!.path).toBe("backend/b");
+  });
+
+  it("deleteByModule removes chunks by id or path prefix", () => {
+    store = new VectorStore(dbPath);
+    store.upsertChunks([
+      {
+        meta: chunk("backend/base-common/util/A", "backend/base-common/util", "util", "A"),
+        embedding: [1, 0],
+      },
+      {
+        meta: chunk("backend/other/util/B", "backend/other/util", "util", "B"),
+        embedding: [0, 1],
+      },
+    ]);
+
+    store.deleteByModule("backend/base-common");
+    const hits = store.search([1, 0], 5);
+    expect(hits).toHaveLength(1);
+    expect(hits[0]!.path).toBe("backend/other/util");
   });
 });

@@ -1,5 +1,5 @@
 import fs from "node:fs/promises";
-import type { ArchChunk, ArchIndexNode, DocumentModel } from "../types.js";
+import type { ArchChunk, ArchIndexNode, AssetCard, AssetKind, DocumentModel } from "../types.js";
 import { getArchIndexMdPath, getArchIndexPath } from "../paths.js";
 
 export interface ArchIndex {
@@ -26,6 +26,26 @@ function baseNode(
   };
 }
 
+const BACKEND_ASSET_KINDS: AssetKind[] = ["util", "enum", "pojo", "starter"];
+
+function assetKindLabel(kind: AssetKind): string {
+  if (kind === "enum") return "Enums";
+  if (kind === "util") return "Utils";
+  return kind.charAt(0).toUpperCase() + kind.slice(1);
+}
+
+function assetKindFile(kind: AssetKind): string {
+  if (kind === "util") return "utils.md";
+  if (kind === "enum") return "enums.md";
+  if (kind === "pojo") return "pojo.md";
+  if (kind === "starter") return "starter.md";
+  return `${kind}.md`;
+}
+
+function groupModuleAssets(cards: AssetCard[] | undefined, slug: string): AssetCard[] {
+  return (cards ?? []).filter((c) => c.module === slug);
+}
+
 export function buildArchIndex(model: DocumentModel): ArchIndex {
   const nodes: Record<string, ArchIndexNode> = {};
   const rootKey = "root";
@@ -39,13 +59,34 @@ export function buildArchIndex(model: DocumentModel): ArchIndex {
 
     const moduleApis = model.apis.filter((a) => a.moduleSlug === mod.slug);
     const moduleRpcs = model.rpcs.filter((r) => r.moduleSlug === mod.slug);
+    const moduleAssets = groupModuleAssets(model.assetCards, mod.slug);
 
     const overviewPath = `${modPath}/overview`;
     const apiPath = `${modPath}/api`;
     const rpcPath = `${modPath}/rpc`;
 
+    const childPaths = [overviewPath, apiPath, rpcPath];
+
+    for (const kind of BACKEND_ASSET_KINDS) {
+      const kindCards = moduleAssets.filter((c) => c.kind === kind);
+      if (kindCards.length === 0) continue;
+      const kindPath = `${modPath}/${kind}`;
+      childPaths.push(kindPath);
+      nodes[kindPath] = baseNode(
+        kindPath,
+        "api-doc",
+        `${mod.name} ${assetKindLabel(kind)}`,
+        `${kindCards.length} ${kind} asset(s)`,
+        {
+          docFile: `backend/${mod.slug}/${assetKindFile(kind)}`,
+          anchors: kindCards.map((c) => c.name),
+          keywords: [mod.slug, ...kindCards.map((c) => c.name), ...kindCards.flatMap((c) => c.tags)],
+        }
+      );
+    }
+
     nodes[modPath] = baseNode(modPath, "module", mod.name, `Backend module ${mod.name}`, {
-      children: [overviewPath, apiPath, rpcPath],
+      children: childPaths,
       keywords: [mod.slug, mod.name, mod.path],
     });
 
@@ -96,9 +137,10 @@ export function buildArchIndex(model: DocumentModel): ArchIndex {
     const overviewPath = `${pkgPath}/overview`;
     const componentsPath = `${pkgPath}/components`;
     const utilsPath = `${pkgPath}/utils`;
+    const enumsPath = `${pkgPath}/enums`;
 
     nodes[pkgPath] = baseNode(pkgPath, "package", pkg.name, pkg.description || pkg.name, {
-      children: [overviewPath, componentsPath, utilsPath],
+      children: [overviewPath, componentsPath, utilsPath, enumsPath],
       keywords: [pkg.slug, pkg.name, pkg.framework ?? ""].filter(Boolean),
     });
 
@@ -133,7 +175,27 @@ export function buildArchIndex(model: DocumentModel): ArchIndex {
       {
         docFile: `frontend/${pkg.slug}/utils.md`,
         anchors: pkg.utils.map((u) => u.name),
-        keywords: [pkg.slug, ...pkg.utils.map((u) => u.name)],
+        keywords: [
+          pkg.slug,
+          ...pkg.utils.map((u) => u.name),
+          ...pkg.utils.flatMap((u) => u.exports),
+        ],
+      }
+    );
+
+    nodes[enumsPath] = baseNode(
+      enumsPath,
+      "component-doc",
+      `${pkg.name} Enums`,
+      `${pkg.enums.length} enum(s)`,
+      {
+        docFile: `frontend/${pkg.slug}/enums.md`,
+        anchors: pkg.enums.map((e) => e.name),
+        keywords: [
+          pkg.slug,
+          ...pkg.enums.map((e) => e.name),
+          ...pkg.enums.flatMap((e) => e.members),
+        ],
       }
     );
   }
@@ -182,10 +244,16 @@ export function renderIndexMd(index: ArchIndex): string {
     const slug = node.path.slice("backend/".length);
     const apiNode = index.nodes[`backend/${slug}/api`];
     const rpcNode = index.nodes[`backend/${slug}/rpc`];
+    const utilsNode = index.nodes[`backend/${slug}/util`];
+    const enumsNode = index.nodes[`backend/${slug}/enum`];
+    const pojoNode = index.nodes[`backend/${slug}/pojo`];
     const apiSummary = apiNode?.summary ?? "";
     const rpcSummary = rpcNode?.summary ?? "";
+    const utilsSummary = utilsNode?.summary ?? "";
+    const enumsSummary = enumsNode?.summary ?? "";
+    const pojoSummary = pojoNode?.summary ?? "";
     moduleRows.push(
-      `| ${escapeCell(node.title)} | ${escapeCell(node.path)} | ${escapeCell(apiSummary)} | ${escapeCell(rpcSummary)} |`
+      `| ${escapeCell(node.title)} | ${escapeCell(node.path)} | ${escapeCell(apiSummary)} | ${escapeCell(rpcSummary)} | ${escapeCell(utilsSummary)} | ${escapeCell(enumsSummary)} | ${escapeCell(pojoSummary)} |`
     );
   }
 
@@ -194,18 +262,19 @@ export function renderIndexMd(index: ArchIndex): string {
     const slug = node.path.slice("frontend/".length);
     const compNode = index.nodes[`frontend/${slug}/components`];
     const utilsNode = index.nodes[`frontend/${slug}/utils`];
+    const enumsNode = index.nodes[`frontend/${slug}/enums`];
     packageRows.push(
-      `| ${escapeCell(node.title)} | ${escapeCell(node.path)} | ${escapeCell(compNode?.summary ?? "")} | ${escapeCell(utilsNode?.summary ?? "")} |`
+      `| ${escapeCell(node.title)} | ${escapeCell(node.path)} | ${escapeCell(compNode?.summary ?? "")} | ${escapeCell(utilsNode?.summary ?? "")} | ${escapeCell(enumsNode?.summary ?? "")} |`
     );
   }
 
   const moduleTable =
     moduleRows.length === 0
-      ? "| _None._ | | | |"
+      ? "| _None._ | | | | | | |"
       : moduleRows.join("\n");
   const packageTable =
     packageRows.length === 0
-      ? "| _None._ | | | |"
+      ? "| _None._ | | | | |"
       : packageRows.join("\n");
 
   return `# Architecture Index
@@ -214,14 +283,14 @@ export function renderIndexMd(index: ArchIndex): string {
 
 ## Backend Modules
 
-| Module | Path | APIs | RPCs |
-|--------|------|------|------|
+| Module | Path | APIs | RPCs | Utils | Enums | POJO |
+|--------|------|------|------|-------|-------|------|
 ${moduleTable}
 
 ## Frontend Packages
 
-| Package | Path | Components | Utils |
-|---------|------|------------|-------|
+| Package | Path | Components | Utils | Enums |
+|---------|------|------------|-------|-------|
 ${packageTable}
 `;
 }

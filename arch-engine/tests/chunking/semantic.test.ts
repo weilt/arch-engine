@@ -39,17 +39,39 @@ const fixtureModel: DocumentModel = {
       slug: "ui",
       name: "@app/ui",
       description: "Shared UI",
-      components: [{ name: "Button", file: "src/components/Button.tsx" }],
-      utils: [{ name: "formatDate", file: "src/utils/format.ts" }],
+      components: [
+        {
+          name: "Button",
+          file: "src/components/Button.tsx",
+          description: "Primary button",
+          exports: ["export function Button()"],
+        },
+      ],
+      utils: [
+        {
+          name: "formatDate",
+          file: "src/utils/format.ts",
+          description: "Format dates",
+          exports: ["export function formatDate(d: Date): string"],
+        },
+      ],
+      enums: [
+        {
+          name: "UserRole",
+          file: "src/enums/UserRole.ts",
+          description: "User roles",
+          members: ["Admin", "User"],
+        },
+      ],
     },
   ],
 };
 
 describe("chunkStructuredEntities", () => {
-  it("creates one L1 chunk per api, rpc, component, and util with embedding prefix", () => {
+  it("creates one L1 chunk per api, rpc, component, util, and enum with embedding prefix", () => {
     const chunks = chunkStructuredEntities(fixtureModel);
 
-    expect(chunks).toHaveLength(4);
+    expect(chunks).toHaveLength(5);
 
     const api = chunks.find((c) => c.kind === "api");
     expect(api).toMatchObject({
@@ -80,9 +102,8 @@ describe("chunkStructuredEntities", () => {
       kind: "component",
       title: "Button",
     });
-    expect(component?.text).toBe(
-      "[kind:component][package:ui]\nButton — File: src/components/Button.tsx"
-    );
+    expect(component?.text).toContain("Primary button");
+    expect(component?.text).toContain("export function Button()");
 
     const util = chunks.find((c) => c.kind === "util");
     expect(util).toMatchObject({
@@ -91,9 +112,16 @@ describe("chunkStructuredEntities", () => {
       kind: "util",
       title: "formatDate",
     });
-    expect(util?.text).toBe(
-      "[kind:util][package:ui]\nformatDate — File: src/utils/format.ts"
-    );
+    expect(util?.text).toContain("Format dates");
+
+    const enumChunk = chunks.find((c) => c.kind === "enum");
+    expect(enumChunk).toMatchObject({
+      path: "frontend/ui/enums",
+      anchor: "UserRole",
+      kind: "enum",
+      title: "UserRole",
+    });
+    expect(enumChunk?.text).toContain("Members: Admin, User");
 
     for (const chunk of chunks) {
       expect(chunk.id).toMatch(
@@ -297,7 +325,7 @@ describe("buildAllChunks", () => {
       overviewMarkdowns
     );
 
-    expect(chunks).toHaveLength(5);
+    expect(chunks).toHaveLength(6);
     expect(fetchMock).not.toHaveBeenCalled();
 
     const overview = chunks.find((c) => c.kind === "overview");
@@ -310,7 +338,7 @@ describe("buildAllChunks", () => {
       "[kind:overview][path:frontend/ui/overview]\n# @app/ui\n\nShared UI package."
     );
 
-    expect(chunks.filter((c) => c.kind !== "overview")).toHaveLength(4);
+    expect(chunks.filter((c) => c.kind !== "overview")).toHaveLength(5);
   });
 });
 

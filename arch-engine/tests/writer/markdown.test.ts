@@ -45,8 +45,30 @@ const fixtureModel: DocumentModel = {
       name: "@app/ui",
       description: "Shared UI components",
       framework: "react",
-      components: [{ name: "Button", file: "src/components/Button.tsx" }],
-      utils: [{ name: "formatDate", file: "src/utils/format.ts" }],
+      components: [
+        {
+          name: "Button",
+          file: "src/components/Button.tsx",
+          description: "Primary button",
+          exports: ["export function Button()"],
+        },
+      ],
+      utils: [
+        {
+          name: "formatDate",
+          file: "src/utils/format.ts",
+          description: "Format dates",
+          exports: ["export function formatDate(d: Date): string"],
+        },
+      ],
+      enums: [
+        {
+          name: "UserRole",
+          file: "src/enums/UserRole.ts",
+          description: "User roles",
+          members: ["Admin", "User"],
+        },
+      ],
     },
   ],
 };
@@ -77,6 +99,7 @@ describe("writeMarkdownTree", () => {
       "utf-8"
     );
     const utilsMd = await fs.readFile(path.join(archDir, "frontend", "ui", "utils.md"), "utf-8");
+    const enumsMd = await fs.readFile(path.join(archDir, "frontend", "ui", "enums.md"), "utf-8");
 
     expect(apiMd).toContain("## POST /auth/login");
     expect(apiMd).toContain("## GET /auth/me");
@@ -84,6 +107,11 @@ describe("writeMarkdownTree", () => {
     expect(rpcMd).toContain("## UserClient");
     expect(overviewMd).toContain("# auth");
     expect(componentsMd).toContain("## Button");
+    expect(componentsMd).toContain("Primary button");
+    expect(componentsMd).toContain("export function Button()");
     expect(utilsMd).toContain("## formatDate");
+    expect(utilsMd).toContain("Format dates");
+    expect(enumsMd).toContain("## UserRole");
+    expect(enumsMd).toContain("Members: Admin, User");
   });
 });

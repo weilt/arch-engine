@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { getArchIndexMdPath, getArchIndexPath } from "../../src/paths.js";
-import type { DocumentModel } from "../../src/types.js";
+import type { AssetCard, DocumentModel } from "../../src/types.js";
 import {
   buildArchIndex,
   loadArchIndex,
@@ -35,6 +35,7 @@ const fixtureModel: DocumentModel = {
       description: "Shared UI",
       components: [],
       utils: [],
+      enums: [],
     },
   ],
 };
@@ -82,6 +83,51 @@ describe("arch-index", () => {
     const md = renderIndexMd(buildArchIndex(fixtureModel));
     expect(md).toContain("| auth |");
     expect(md).toContain("| @app/ui |");
+  });
+
+  it("buildArchIndex adds utils and enums nodes when assetCards present", () => {
+    const assetCards: AssetCard[] = [
+      {
+        id: "backend/auth/util/JsonUtils",
+        kind: "util",
+        name: "JsonUtils",
+        module: "auth",
+        path: "auth/src/JsonUtils.java",
+        summary: "JSON",
+        whenToUse: "x",
+        howToUse: "y",
+        exports: [],
+        related: [],
+        tags: [],
+        source: "scan",
+        updatedAt: "2026-06-02T00:00:00.000Z",
+      },
+      {
+        id: "backend/auth/enum/Status",
+        kind: "enum",
+        name: "Status",
+        module: "auth",
+        path: "auth/src/Status.java",
+        summary: "Status",
+        whenToUse: "x",
+        howToUse: "y",
+        exports: [],
+        related: [],
+        tags: [],
+        source: "scan",
+        updatedAt: "2026-06-02T00:00:00.000Z",
+      },
+    ];
+    const index = buildArchIndex({ ...fixtureModel, assetCards });
+
+    expect(index.nodes["backend/auth/util"]).toBeDefined();
+    expect(index.nodes["backend/auth/util"]?.docFile).toBe("backend/auth/utils.md");
+    expect(index.nodes["backend/auth/enum"]).toBeDefined();
+    expect(index.nodes["backend/auth"].children).toContain("backend/auth/util");
+    expect(index.nodes["backend/auth"].children).toContain("backend/auth/enum");
+
+    const md = renderIndexMd(index);
+    expect(md).toContain("| Utils | Enums | POJO |");
   });
 
   it("readArchIndex and loadArchIndex round-trip JSON", async () => {

@@ -13,11 +13,14 @@
   "scripts": {
     "build": "tsc",
     "test": "vitest run",
+    "probe-maas": "node scripts/probe-maas.mjs",
+    "probe-maas-quick": "node scripts/probe-maas-quick.mjs",
     "dev": "tsc --watch"
   },
   "dependencies": {
     "better-sqlite3": "^11.8.0",
     "fast-glob": "^3.3.3",
+    "sqlite-vec": "^0.1.9",
     "yaml": "^2.7.0"
   },
   "devDependencies": {
@@ -26,5 +29,7 @@
     "typescript": "^5.8.0",
     "vitest": "^3.0.0"
   },
-  "engines": { "node": ">=18" }
+  "engines": {
+    "node": ">=18"
+  }
 }

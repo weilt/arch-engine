@@ -30,11 +30,43 @@ function mockFetch() {
 
     if (target.endsWith("/chat/completions")) {
       const body = JSON.parse(String(init?.body)) as {
-        messages: { content: string }[];
+        messages: { role: string; content: string }[];
       };
-      const userContent = body.messages.find((m) => m.content.includes("Context path"))
-        ?.content;
-      const pathMatch = userContent?.match(/Context path: ([^\n]+)/);
+      const userContent =
+        body.messages.find((m) => m.role === "user")?.content ?? "";
+
+      if (userContent.includes("Candidates (")) {
+        const jsonMatch = userContent.match(/Candidates \(\d+\):\s*(\[[\s\S]+\])/);
+        const candidates = jsonMatch
+          ? (JSON.parse(jsonMatch[1]!) as { name: string; kind: string; signatures: string[] }[])
+          : [];
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            choices: [
+              {
+                message: {
+                  content: JSON.stringify({
+                    cards: candidates.map((c) => ({
+                      kind: c.kind,
+                      name: c.name,
+                      summary: `${c.name} 摘要`,
+                      whenToUse: "集成测试场景",
+                      howToUse: "集成测试用法",
+                      exports: c.signatures,
+                      related: [],
+                      tags: [],
+                    })),
+                  }),
+                },
+              },
+            ],
+          }),
+        };
+      }
+
+      const pathMatch = userContent.match(/Context path: ([^\n]+)/);
       const pathKey = pathMatch?.[1] ?? "unknown";
 
       return {
@@ -135,7 +167,7 @@ describe("runStartInit integration", () => {
     ).toBe(true);
     expect(
       fetchMock.mock.calls.some(([url]) => String(url).endsWith("/chat/completions"))
-    ).toBe(false);
+    ).toBe(true);
   });
 
   it("returns config-created when arch.config.json is missing", async () => {

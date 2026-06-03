@@ -18,3 +18,6 @@ export function getArchIndexMdPath(projectRoot: string): string {
 export function getVectorsDbPath(projectRoot: string): string {
   return path.join(getArchDir(projectRoot), "vectors.db");
 }
+export function getLastScanPath(projectRoot: string): string {
+  return path.join(getArchDir(projectRoot), "last-scan.json");
+}

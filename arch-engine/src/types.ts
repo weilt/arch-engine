@@ -20,13 +20,28 @@ export interface RpcEndpoint {
   source: "java";
 }
 
+export interface FrontendSymbol {
+  name: string;
+  file: string;
+  description: string;
+  exports: string[];
+}
+
+export interface FrontendEnum {
+  name: string;
+  file: string;
+  description: string;
+  members: string[];
+}
+
 export interface FrontendPackage {
   slug: string;
   name: string;
   description: string;
   framework?: string;
-  components: { name: string; file: string }[];
-  utils: { name: string; file: string }[];
+  components: FrontendSymbol[];
+  utils: FrontendSymbol[];
+  enums: FrontendEnum[];
 }
 
 export interface JavaModule {
@@ -40,13 +55,60 @@ export interface DocumentModel {
   apis: ApiEndpoint[];
   rpcs: RpcEndpoint[];
   packages: FrontendPackage[];
+  /** Backend AssetCards written to utils/enums/pojo md (optional, SA-1+). */
+  assetCards?: AssetCard[];
+}
+
+export type AssetKind =
+  | "api"
+  | "rpc"
+  | "component"
+  | "util"
+  | "enum"
+  | "starter"
+  | "pojo"
+  | "contract";
+
+export interface AssetCard {
+  id: string;
+  kind: AssetKind;
+  name: string;
+  module: string;
+  path: string;
+  summary: string;
+  whenToUse: string;
+  howToUse: string;
+  exports: string[];
+  related: string[];
+  tags: string[];
+  source: "scan" | "register";
+  updatedAt: string;
+}
+
+export interface RawCandidate {
+  kind: AssetKind;
+  name: string;
+  moduleSlug: string;
+  filePath: string;
+  javadoc: string;
+  signatures: string[];
+  extra?: Record<string, string>;
 }
 
 export interface ArchChunk {
   id: string;
   path: string;
   anchor?: string;
-  kind: "api" | "rpc" | "component" | "util" | "overview" | "convention";
+  kind:
+    | "api"
+    | "rpc"
+    | "component"
+    | "util"
+    | "enum"
+    | "overview"
+    | "convention"
+    | "starter"
+    | "pojo";
   title: string;
   text: string;
 }
@@ -61,6 +123,21 @@ export interface ArchIndexNode {
   chunks: string[];
   keywords: string[];
   anchors?: string[];
+}
+
+export interface LastScanModuleEntry {
+  sourcePath: string;
+  assetCount: number;
+  fileHashes: Record<string, string>;
+}
+
+export interface LastScanState {
+  version: 2;
+  commit: string;
+  branch: string;
+  scannedAt: string;
+  modules: Record<string, LastScanModuleEntry>;
+  packages: Record<string, LastScanModuleEntry>;
 }
 
 export interface ArchConfig {
@@ -81,7 +158,26 @@ export interface ArchConfig {
     chatModel: string;
     maxChunkTokens: number;
     strategy: "semantic-only";
+    /** Candidates per summarize LLM request (default 8). Lower if MaaS returns 500/EOF. */
+    summarizeBatchSize?: number;
+    /** Retries on 429/5xx for summarize (default 3, same as semantic split). */
+    summarizeMaxRetries?: number;
+    /** Base delay ms before first summarize retry (default 1000, doubles each attempt). */
+    summarizeRetryBaseDelayMs?: number;
+    /** Max public signatures per candidate in summarize prompt (default 12). */
+    maxSignaturesPerCandidate?: number;
+    /** Max output tokens for summarize completion (default 4096). */
+    summarizeMaxTokens?: number;
+    /** Pause ms between summarize batches within one module (default 300). */
+    summarizeBatchDelayMs?: number;
+    /**
+     * Use OpenAI json_object response_format for summarize.
+     * Default: false when chatModel name contains "code" (e.g. astron-code-latest).
+     */
+    summarizeJsonMode?: boolean;
   };
   apiSpecGlobs: string[];
+  /** Optional glob patterns for design-system / UI base packages (e.g. "@star/ui"). */
+  designSystemPackages?: string[];
   scanners: { java: boolean; frontend: boolean };
 }

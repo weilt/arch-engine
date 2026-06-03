@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { resolveApiKey } from "../config.js";
 import { archLog, readHttpErrorBody } from "../log.js";
-import type { ArchChunk, ArchConfig, DocumentModel } from "../types.js";
+import type { ArchChunk, ArchConfig, DocumentModel, FrontendEnum, FrontendSymbol } from "../types.js";
 
 export type SemanticSplitChunk = {
   title: string;
@@ -65,6 +65,34 @@ function normalizeSemanticChunks(raw: unknown): SemanticSplitChunk[] {
     .filter((c): c is SemanticSplitChunk => c !== null);
 }
 
+function formatSymbolChunkText(
+  kind: "component" | "util",
+  packageSlug: string,
+  symbol: FrontendSymbol
+): string {
+  const lines = [
+    `[kind:${kind}][package:${packageSlug}]`,
+    `${symbol.name} — File: ${symbol.file}`,
+  ];
+  if (symbol.description) lines.push(`Description: ${symbol.description}`);
+  if (symbol.exports.length > 0) {
+    lines.push(`Exports: ${symbol.exports.join("; ")}`);
+  }
+  return lines.join("\n");
+}
+
+function formatEnumChunkText(packageSlug: string, enumDef: FrontendEnum): string {
+  const lines = [
+    `[kind:enum][package:${packageSlug}]`,
+    `${enumDef.name} — File: ${enumDef.file}`,
+  ];
+  if (enumDef.description) lines.push(`Description: ${enumDef.description}`);
+  if (enumDef.members.length > 0) {
+    lines.push(`Members: ${enumDef.members.join(", ")}`);
+  }
+  return lines.join("\n");
+}
+
 export function chunkStructuredEntities(model: DocumentModel): ArchChunk[] {
   const chunks: ArchChunk[] = [];
 
@@ -98,7 +126,7 @@ export function chunkStructuredEntities(model: DocumentModel): ArchChunk[] {
         anchor: component.name,
         kind: "component",
         title: component.name,
-        text: `[kind:component][package:${pkg.slug}]\n${component.name} — File: ${component.file}`,
+        text: formatSymbolChunkText("component", pkg.slug, component),
       });
     }
 
@@ -109,7 +137,18 @@ export function chunkStructuredEntities(model: DocumentModel): ArchChunk[] {
         anchor: util.name,
         kind: "util",
         title: util.name,
-        text: `[kind:util][package:${pkg.slug}]\n${util.name} — File: ${util.file}`,
+        text: formatSymbolChunkText("util", pkg.slug, util),
+      });
+    }
+
+    for (const enumDef of pkg.enums) {
+      chunks.push({
+        id: randomUUID(),
+        path: `frontend/${pkg.slug}/enums`,
+        anchor: enumDef.name,
+        kind: "enum",
+        title: enumDef.name,
+        text: formatEnumChunkText(pkg.slug, enumDef),
       });
     }
   }

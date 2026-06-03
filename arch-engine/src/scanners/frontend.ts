@@ -2,7 +2,14 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import fg from "fast-glob";
 import { parse as parseYaml } from "yaml";
-import type { FrontendPackage } from "../types.js";
+import type {
+  FrontendEnum,
+  FrontendPackage,
+  FrontendSymbol,
+  RawCandidate,
+} from "../types.js";
+import { discoverExports } from "./ts-export.js";
+import { extractFromSource, extractVueScript } from "./ts-doc.js";
 
 interface PackageJson {
   name?: string;
@@ -11,6 +18,8 @@ interface PackageJson {
   devDependencies?: Record<string, string>;
   workspaces?: string[] | { packages?: string[] };
 }
+
+const SOURCE_GLOBS = ["src/**/*.{ts,tsx,vue}"];
 
 async function readJson<T>(filePath: string): Promise<T | null> {
   try {
@@ -52,50 +61,200 @@ function inferFramework(pkg: PackageJson): string | undefined {
   return undefined;
 }
 
-const COMPONENT_GLOBS = [
-  "src/components/*.tsx",
-  "src/components/*.ts",
-  "src/components/*.vue",
-];
-const UTIL_GLOBS = ["src/utils/*.tsx", "src/utils/*.ts", "src/utils/*.vue"];
+async function readSourceContent(absPath: string): Promise<string> {
+  const raw = await fs.readFile(absPath, "utf-8");
+  if (absPath.endsWith(".vue")) return extractVueScript(raw);
+  return raw;
+}
 
-async function scanPackageDir(pkgDir: string): Promise<FrontendPackage | null> {
-  const pkg = await readJson<PackageJson>(path.join(pkgDir, "package.json"));
-  if (!pkg?.name) return null;
+async function collectSourceFiles(pkgDir: string): Promise<string[]> {
+  const found = await fg.glob(SOURCE_GLOBS, {
+    cwd: pkgDir,
+    absolute: false,
+    ignore: ["**/node_modules/**", "**/dist/**"],
+  });
+  return [...new Set(found)].sort((a, b) => a.localeCompare(b));
+}
 
-  const components: { name: string; file: string }[] = [];
-  const utils: { name: string; file: string }[] = [];
+function fileKindHints(
+  discovered: ReturnType<typeof discoverExports>
+): Set<"component" | "util" | "enum"> {
+  return new Set(discovered.map((item) => item.kindHint));
+}
 
-  for (const pattern of COMPONENT_GLOBS) {
-    const files = await fg.glob(pattern, { cwd: pkgDir, absolute: false });
-    for (const file of files) {
-      components.push({
-        name: path.basename(file, path.extname(file)),
-        file,
-      });
+function toRawCandidate(
+  projectRoot: string,
+  pkgDir: string,
+  moduleSlug: string,
+  relativeFile: string,
+  exportItem: { name: string; kindHint: "component" | "util" | "enum" },
+  doc: ReturnType<typeof extractFromSource>
+): RawCandidate {
+  const absPath = path.join(pkgDir, relativeFile);
+  const relPath = path.relative(projectRoot, absPath).replace(/\\/g, "/");
+  const enumDoc = doc.enums.find((e) => e.name === exportItem.name);
+
+  return {
+    kind: exportItem.kindHint,
+    name: exportItem.name,
+    moduleSlug,
+    filePath: relPath,
+    javadoc:
+      exportItem.kindHint === "enum"
+        ? (enumDoc?.description ?? doc.description)
+        : doc.description,
+    signatures:
+      exportItem.kindHint === "enum"
+        ? (enumDoc?.members ?? [])
+        : doc.exports.filter((line) => line.includes(exportItem.name)),
+  };
+}
+
+function buildFrontendSymbol(
+  relativeFile: string,
+  doc: ReturnType<typeof extractFromSource>
+): FrontendSymbol {
+  const name = path.basename(relativeFile, path.extname(relativeFile));
+  return {
+    name,
+    file: relativeFile,
+    description: doc.description,
+    exports: doc.exports,
+  };
+}
+
+function buildFrontendEnum(
+  relativeFile: string,
+  doc: ReturnType<typeof extractFromSource>,
+  exportName: string
+): FrontendEnum {
+  const enumDoc = doc.enums.find((e) => e.name === exportName);
+  return {
+    name: exportName,
+    file: relativeFile,
+    description: enumDoc?.description ?? doc.description,
+    members: enumDoc?.members ?? [],
+  };
+}
+
+export async function discoverFrontendCandidates(
+  projectRoot: string,
+  pkgDir: string,
+  moduleSlug: string
+): Promise<RawCandidate[]> {
+  const candidates: RawCandidate[] = [];
+  const files = await collectSourceFiles(pkgDir);
+
+  for (const relativeFile of files) {
+    try {
+      const content = await readSourceContent(path.join(pkgDir, relativeFile));
+      const baseName = path.basename(relativeFile, path.extname(relativeFile));
+      const doc = extractFromSource(content, baseName);
+      const discovered = discoverExports(content, relativeFile);
+
+      for (const exportItem of discovered) {
+        candidates.push(
+          toRawCandidate(projectRoot, pkgDir, moduleSlug, relativeFile, exportItem, doc)
+        );
+      }
+
+      if (discovered.length === 0 && doc.enums.length > 0) {
+        for (const enumDoc of doc.enums) {
+          candidates.push({
+            kind: "enum",
+            name: enumDoc.name,
+            moduleSlug,
+            filePath: path
+              .relative(projectRoot, path.join(pkgDir, relativeFile))
+              .replace(/\\/g, "/"),
+            javadoc: enumDoc.description,
+            signatures: enumDoc.members,
+          });
+        }
+      }
+    } catch {
+      // skip unreadable files
     }
   }
 
-  for (const pattern of UTIL_GLOBS) {
-    const files = await fg.glob(pattern, { cwd: pkgDir, absolute: false });
-    for (const file of files) {
-      utils.push({
-        name: path.basename(file, path.extname(file)),
-        file,
-      });
+  candidates.sort((a, b) => a.name.localeCompare(b.name));
+  return candidates;
+}
+
+async function scanPackageDir(
+  projectRoot: string,
+  pkgDir: string
+): Promise<FrontendPackage | null> {
+  const pkg = await readJson<PackageJson>(path.join(pkgDir, "package.json"));
+  if (!pkg?.name) return null;
+
+  const moduleSlug = slugFromPackageName(pkg.name);
+  const files = await collectSourceFiles(pkgDir);
+
+  const components: FrontendSymbol[] = [];
+  const utils: FrontendSymbol[] = [];
+  const enums: FrontendEnum[] = [];
+  const seenComponentFiles = new Set<string>();
+  const seenUtilFiles = new Set<string>();
+  const seenEnumKeys = new Set<string>();
+
+  for (const relativeFile of files) {
+    try {
+      const content = await readSourceContent(path.join(pkgDir, relativeFile));
+      const baseName = path.basename(relativeFile, path.extname(relativeFile));
+      const doc = extractFromSource(content, baseName);
+      const discovered = discoverExports(content, relativeFile);
+      const hints = fileKindHints(discovered);
+
+      if (hints.has("component") && !seenComponentFiles.has(relativeFile)) {
+        components.push(buildFrontendSymbol(relativeFile, doc));
+        seenComponentFiles.add(relativeFile);
+      }
+
+      if (hints.has("util") && !seenUtilFiles.has(relativeFile)) {
+        utils.push(buildFrontendSymbol(relativeFile, doc));
+        seenUtilFiles.add(relativeFile);
+      }
+
+      if (hints.has("enum")) {
+        for (const exportItem of discovered.filter((item) => item.kindHint === "enum")) {
+          const key = `${relativeFile}:${exportItem.name}`;
+          if (seenEnumKeys.has(key)) continue;
+          enums.push(buildFrontendEnum(relativeFile, doc, exportItem.name));
+          seenEnumKeys.add(key);
+        }
+      }
+
+      if (discovered.length === 0 && doc.enums.length > 0) {
+        for (const enumDoc of doc.enums) {
+          const key = `${relativeFile}:${enumDoc.name}`;
+          if (seenEnumKeys.has(key)) continue;
+          enums.push({
+            name: enumDoc.name,
+            file: relativeFile,
+            description: enumDoc.description,
+            members: enumDoc.members,
+          });
+          seenEnumKeys.add(key);
+        }
+      }
+    } catch {
+      // skip unreadable files
     }
   }
 
   components.sort((a, b) => a.name.localeCompare(b.name));
   utils.sort((a, b) => a.name.localeCompare(b.name));
+  enums.sort((a, b) => a.name.localeCompare(b.name));
 
   return {
-    slug: slugFromPackageName(pkg.name),
+    slug: moduleSlug,
     name: pkg.name,
     description: pkg.description ?? "",
     framework: inferFramework(pkg),
     components,
     utils,
+    enums,
   };
 }
 
@@ -114,7 +273,7 @@ export async function scanFrontend(projectRoot: string): Promise<FrontendPackage
   if (patterns.length === 0) {
     const rootPkg = await readJson<PackageJson>(path.join(projectRoot, "package.json"));
     if (!rootPkg?.name) return [];
-    const pkg = await scanPackageDir(projectRoot);
+    const pkg = await scanPackageDir(projectRoot, projectRoot);
     return pkg ? [pkg] : [];
   }
 
@@ -125,7 +284,7 @@ export async function scanFrontend(projectRoot: string): Promise<FrontendPackage
 
   const packages: FrontendPackage[] = [];
   for (const pkgJsonPath of pkgJsonPaths) {
-    const scanned = await scanPackageDir(path.dirname(pkgJsonPath));
+    const scanned = await scanPackageDir(projectRoot, path.dirname(pkgJsonPath));
     if (scanned) packages.push(scanned);
   }
 

@@ -1,23 +1,61 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import fg from "fast-glob";
+import { parse as parseYaml } from "yaml";
 import { loadOrInitConfig, resolveApiKey } from "./config.js";
 import { archLog } from "./log.js";
 import { buildAllChunks } from "./chunking/semantic.js";
 import { embedTexts } from "./embedding/openai-compatible.js";
+import {
+  GitDiffError,
+  getChangedFilesSince,
+  getCurrentBranch,
+  getCurrentCommit,
+  mapFilesToModules,
+  mapFilesToPackages,
+} from "./incremental/git-diff.js";
+import { readLastScan, writeLastScan } from "./incremental/last-scan.js";
 import { getArchDir, getVectorsDbPath } from "./paths.js";
-import { scanFrontend } from "./scanners/frontend.js";
-import { findMavenModules, scanJavaSources } from "./scanners/java.js";
+import {
+  discoverFrontendCandidates,
+  scanFrontend,
+} from "./scanners/frontend.js";
+import { discoverFrontendStarterCandidates } from "./scanners/frontend-starter.js";
+import {
+  discoverJavaCandidates,
+  discoverJavaStarterCandidates,
+  findMavenModules,
+  isStarterModule,
+  scanJavaSources,
+} from "./scanners/java.js";
 import { mergeDocumentModel } from "./scanners/merge.js";
 import { scanOpenApiGlobs } from "./scanners/openapi.js";
-import type { DocumentModel } from "./types.js";
+import type {
+  ArchChunk,
+  ArchConfig,
+  AssetCard,
+  FrontendPackage,
+  JavaModule,
+  LastScanState,
+  RawCandidate,
+} from "./types.js";
 import { VectorStore } from "./vector/sqlite-store.js";
+import { assetCardsToChunks } from "./asset/chunks-from-cards.js";
+import {
+  resolveSummarizeBatchSize,
+  summarizeCandidates,
+  type SummarizeFn,
+} from "./summarize/batch.js";
 import {
   attachChunksToIndex,
   buildArchIndex,
+  loadArchIndex,
   writeArchIndex,
   writeIndexMd,
   writeMarkdownTree,
+  type ArchIndex,
 } from "./writer/index.js";
+import { writeModuleAssetDocs } from "./writer/asset-md.js";
 
 export type StartInitReport =
   | { status: "config-created" }
@@ -27,6 +65,21 @@ export type StartInitReport =
       apiCount: number;
       moduleCount: number;
     };
+
+export interface PipelineDeps {
+  summarizeFn?: SummarizeFn;
+  batchSize?: number;
+}
+
+export interface PipelineOptions {
+  /** Force full rescan (ignore last-scan.json). */
+  full?: boolean;
+}
+
+export interface ModuleBatchResult {
+  cards: AssetCard[];
+  chunks: ArchChunk[];
+}
 
 export async function cleanArchDir(projectRoot: string): Promise<void> {
   const archDir = getArchDir(projectRoot);
@@ -49,12 +102,13 @@ export async function cleanArchDir(projectRoot: string): Promise<void> {
 
 async function readOverviewMarkdowns(
   projectRoot: string,
-  model: DocumentModel
+  modules: JavaModule[],
+  packageSlugs: string[]
 ): Promise<Map<string, string>> {
   const archDir = getArchDir(projectRoot);
   const map = new Map<string, string>();
 
-  for (const mod of model.modules) {
+  for (const mod of modules) {
     const pathKey = `backend/${mod.slug}/overview`;
     const filePath = path.join(archDir, "backend", mod.slug, "overview.md");
     try {
@@ -64,9 +118,9 @@ async function readOverviewMarkdowns(
     }
   }
 
-  for (const pkg of model.packages) {
-    const pathKey = `frontend/${pkg.slug}/overview`;
-    const filePath = path.join(archDir, "frontend", pkg.slug, "overview.md");
+  for (const slug of packageSlugs) {
+    const pathKey = `frontend/${slug}/overview`;
+    const filePath = path.join(archDir, "frontend", slug, "overview.md");
     try {
       map.set(pathKey, await fs.readFile(filePath, "utf-8"));
     } catch {
@@ -77,7 +131,194 @@ async function readOverviewMarkdowns(
   return map;
 }
 
-export async function runStartInit(projectRoot: string): Promise<StartInitReport> {
+async function resolveFrontendPackageDirs(
+  projectRoot: string
+): Promise<Map<string, string>> {
+  const dirs = new Map<string, string>();
+
+  let patterns: string[] = [];
+  const pnpmWorkspace = path.join(projectRoot, "pnpm-workspace.yaml");
+  try {
+    const content = await fs.readFile(pnpmWorkspace, "utf-8");
+    const doc = parseYaml(content) as { packages?: string[] };
+    patterns = doc.packages ?? [];
+  } catch {
+    // not a pnpm workspace
+  }
+
+  if (patterns.length === 0) {
+    try {
+      const raw = await fs.readFile(path.join(projectRoot, "package.json"), "utf-8");
+      const pkg = JSON.parse(raw) as {
+        name?: string;
+        workspaces?: string[] | { packages?: string[] };
+      };
+      if (pkg.workspaces) {
+        patterns = Array.isArray(pkg.workspaces)
+          ? pkg.workspaces
+          : (pkg.workspaces.packages ?? []);
+      } else if (pkg.name) {
+        const packages = await scanFrontend(projectRoot);
+        for (const p of packages) {
+          dirs.set(p.slug, projectRoot);
+        }
+        return dirs;
+      }
+    } catch {
+      return dirs;
+    }
+  }
+
+  const pkgJsonGlobs = patterns.map((pattern) => {
+    const normalized = pattern.replace(/\/+$/, "");
+    return normalized.includes("*")
+      ? `${normalized}/package.json`
+      : `${normalized}/package.json`;
+  });
+
+  const pkgJsonPaths = await fg.glob(pkgJsonGlobs, {
+    cwd: projectRoot,
+    absolute: true,
+  });
+
+  for (const pkgJsonPath of pkgJsonPaths) {
+    try {
+      const raw = await fs.readFile(pkgJsonPath, "utf-8");
+      const pkg = JSON.parse(raw) as { name?: string };
+      if (!pkg.name) continue;
+      const base = pkg.name.includes("/") ? pkg.name.split("/").pop()! : pkg.name;
+      const slug = base.toLowerCase().replace(/[^a-z0-9-]/gi, "-");
+      dirs.set(slug, path.dirname(pkgJsonPath));
+    } catch {
+      // skip invalid package.json
+    }
+  }
+
+  return dirs;
+}
+
+function buildLastScanState(
+  projectRoot: string,
+  previous: LastScanState | null,
+  modules: JavaModule[],
+  packages: FrontendPackage[],
+  packageDirs: Map<string, string>,
+  moduleAssetCounts: Map<string, number>,
+  packageAssetCounts: Map<string, number>,
+  commit: string,
+  branch: string
+): LastScanState {
+  const modulesState: LastScanState["modules"] = { ...(previous?.modules ?? {}) };
+  for (const mod of modules) {
+    modulesState[mod.slug] = {
+      sourcePath: mod.path,
+      assetCount: moduleAssetCounts.get(mod.slug) ?? modulesState[mod.slug]?.assetCount ?? 0,
+      fileHashes: modulesState[mod.slug]?.fileHashes ?? {},
+    };
+  }
+
+  const packagesState: LastScanState["packages"] = { ...(previous?.packages ?? {}) };
+  for (const pkg of packages) {
+    const dir = packageDirs.get(pkg.slug);
+    packagesState[pkg.slug] = {
+      sourcePath: dir
+        ? path.relative(projectRoot, dir).replace(/\\/g, "/")
+        : (packagesState[pkg.slug]?.sourcePath ?? pkg.slug),
+      assetCount: packageAssetCounts.get(pkg.slug) ?? packagesState[pkg.slug]?.assetCount ?? 0,
+      fileHashes: packagesState[pkg.slug]?.fileHashes ?? {},
+    };
+  }
+
+  return {
+    version: 2,
+    commit,
+    branch,
+    scannedAt: new Date().toISOString(),
+    modules: modulesState,
+    packages: packagesState,
+  };
+}
+
+async function mergeIncrementalChunksToIndex(
+  projectRoot: string,
+  newChunks: ArchChunk[],
+  affectedPrefixes: string[]
+): Promise<ArchIndex> {
+  const index = await loadArchIndex(projectRoot);
+
+  for (const node of Object.values(index.nodes)) {
+    if (affectedPrefixes.some((prefix) => node.path === prefix || node.path.startsWith(`${prefix}/`))) {
+      node.chunks = [];
+    }
+  }
+
+  for (const chunk of newChunks) {
+    const node = index.nodes[chunk.path];
+    if (node) {
+      node.chunks.push(chunk.id);
+    }
+  }
+
+  await writeArchIndex(projectRoot, index);
+  return index;
+}
+
+export async function runModuleBatch(
+  projectRoot: string,
+  config: ArchConfig,
+  scope: "backend" | "frontend",
+  moduleSlug: string,
+  candidates: RawCandidate[],
+  store: VectorStore,
+  deps: PipelineDeps = {}
+): Promise<ModuleBatchResult> {
+  if (candidates.length === 0) {
+    return { cards: [], chunks: [] };
+  }
+
+  archLog.info("module-batch: summarize", {
+    scope,
+    moduleSlug,
+    candidateCount: candidates.length,
+  });
+
+  const cards = await summarizeCandidates(config, candidates, moduleSlug, {
+    batchSize: deps.batchSize ?? resolveSummarizeBatchSize(config),
+    summarizeFn: deps.summarizeFn,
+    scope,
+  });
+
+  await writeModuleAssetDocs(projectRoot, moduleSlug, cards, scope);
+
+  const chunks = assetCardsToChunks(cards, scope);
+  if (chunks.length === 0) {
+    return { cards, chunks };
+  }
+
+  archLog.info("module-batch: embedding", {
+    scope,
+    moduleSlug,
+    chunkCount: chunks.length,
+  });
+
+  const embeddings = await embedTexts(
+    config,
+    chunks.map((c) => c.text)
+  );
+  const modulePrefix = `${scope}/${moduleSlug}`;
+  store.deleteByModule(modulePrefix);
+  store.upsertChunks(
+    chunks.map((c, i) => ({ meta: c, embedding: embeddings[i]!, sourcePath: cards[i]?.path }))
+  );
+
+  return { cards, chunks };
+}
+
+export async function runStartInit(
+  projectRoot: string,
+  deps: PipelineDeps = {},
+  options: PipelineOptions = {}
+): Promise<StartInitReport> {
   archLog.info("start-init: begin", { projectRoot });
 
   const { config, created } = await loadOrInitConfig(projectRoot);
@@ -98,8 +339,15 @@ export async function runStartInit(projectRoot: string): Promise<StartInitReport
   resolveApiKey(config, "embedding");
   resolveApiKey(config, "chunking");
 
-  archLog.info("start-init: cleaning .ai/arch output");
-  await cleanArchDir(projectRoot);
+  const previousScan = await readLastScan(projectRoot);
+  let incremental = !options.full && previousScan !== null;
+  let affectedModules = new Set<string>();
+  let affectedPackages = new Set<string>();
+
+  if (!incremental) {
+    archLog.info("start-init: cleaning .ai/arch output");
+    await cleanArchDir(projectRoot);
+  }
 
   archLog.info("start-init: scanning project");
   const modules = config.scanners.java ? await findMavenModules(projectRoot) : [];
@@ -115,46 +363,202 @@ export async function runStartInit(projectRoot: string): Promise<StartInitReport
     apis: model.apis.length,
     rpcs: model.rpcs.length,
     packages: model.packages.length,
+    incremental,
   });
 
-  archLog.info("start-init: writing markdown and index");
-  await writeMarkdownTree(projectRoot, model);
-  const index = buildArchIndex(model);
-  await writeArchIndex(projectRoot, index);
+  if (!incremental) {
+    archLog.info("start-init: writing base markdown and index");
+    await writeMarkdownTree(projectRoot, model);
+    const index = buildArchIndex(model);
+    await writeArchIndex(projectRoot, index);
+  }
 
-  const overviewMarkdowns = await readOverviewMarkdowns(projectRoot, model);
-  archLog.info("start-init: semantic chunking", {
-    overviewDocs: overviewMarkdowns.size,
-  });
-  const chunks = await buildAllChunks(config, model, overviewMarkdowns);
+  const packageDirs = config.scanners.frontend
+    ? await resolveFrontendPackageDirs(projectRoot)
+    : new Map<string, string>();
 
-  archLog.info("start-init: embedding chunks", { chunkCount: chunks.length });
-  const embeddings = await embedTexts(
-    config,
-    chunks.map((c) => c.text)
+  if (incremental && previousScan) {
+    try {
+      const changed = getChangedFilesSince(projectRoot, previousScan.commit);
+      affectedModules = mapFilesToModules(changed, model.modules);
+      affectedPackages = mapFilesToPackages(
+        changed,
+        model.packages,
+        packageDirs,
+        projectRoot
+      );
+      archLog.info("start-init: incremental mode", {
+        changedFiles: changed.length,
+        affectedModules: [...affectedModules],
+        affectedPackages: [...affectedPackages],
+      });
+    } catch (e) {
+      if (e instanceof GitDiffError) {
+        archLog.info("start-init: git diff failed, falling back to full scan", {
+          error: e instanceof Error ? e.message : String(e),
+        });
+        incremental = false;
+        affectedModules = new Set(model.modules.map((m) => m.slug));
+        affectedPackages = new Set(model.packages.map((p) => p.slug));
+        await cleanArchDir(projectRoot);
+        await writeMarkdownTree(projectRoot, model);
+        const index = buildArchIndex(model);
+        await writeArchIndex(projectRoot, index);
+      } else {
+        throw e;
+      }
+    }
+  }
+
+  const modulesToProcess = incremental
+    ? model.modules.filter((m) => affectedModules.has(m.slug))
+    : model.modules;
+
+  const packagesToProcess = incremental
+    ? model.packages.filter((p) => affectedPackages.has(p.slug))
+    : model.packages;
+
+  const store = new VectorStore(getVectorsDbPath(projectRoot));
+  const allAssetCards: AssetCard[] = [];
+  const allChunks: ArchChunk[] = [];
+  const moduleAssetCounts = new Map<string, number>(
+    Object.entries(previousScan?.modules ?? {}).map(([slug, entry]) => [slug, entry.assetCount])
+  );
+  const packageAssetCounts = new Map<string, number>(
+    Object.entries(previousScan?.packages ?? {}).map(([slug, entry]) => [slug, entry.assetCount])
   );
 
-  archLog.info("start-init: writing vector store");
-  const store = new VectorStore(getVectorsDbPath(projectRoot));
   try {
-    store.clear();
-    store.insert(chunks.map((c, i) => ({ meta: c, embedding: embeddings[i]! })));
+    if (!incremental) {
+      store.clear();
+    }
+
+    for (const mod of modulesToProcess) {
+      const javaCandidates = config.scanners.java
+        ? await discoverJavaCandidates(projectRoot, mod)
+        : [];
+      const starterCandidates =
+        config.scanners.java && (await isStarterModule(projectRoot, mod))
+          ? await discoverJavaStarterCandidates(projectRoot, mod)
+          : [];
+      const candidates = [...starterCandidates, ...javaCandidates];
+      const { cards, chunks } = await runModuleBatch(
+        projectRoot,
+        config,
+        "backend",
+        mod.slug,
+        candidates,
+        store,
+        deps
+      );
+      allAssetCards.push(...cards);
+      allChunks.push(...chunks);
+      moduleAssetCounts.set(mod.slug, cards.length);
+    }
+
+    for (const pkg of packagesToProcess) {
+      const pkgDir = packageDirs.get(pkg.slug);
+      const frontendCandidates =
+        pkgDir && config.scanners.frontend
+          ? await discoverFrontendCandidates(projectRoot, pkgDir, pkg.slug)
+          : [];
+      const starterCandidates =
+        pkgDir && config.scanners.frontend
+          ? await discoverFrontendStarterCandidates(
+              projectRoot,
+              pkgDir,
+              pkg.slug,
+              pkg,
+              config
+            )
+          : [];
+      const candidates = [...starterCandidates, ...frontendCandidates];
+      const { cards, chunks } = await runModuleBatch(
+        projectRoot,
+        config,
+        "frontend",
+        pkg.slug,
+        candidates,
+        store,
+        deps
+      );
+      allAssetCards.push(...cards);
+      allChunks.push(...chunks);
+      packageAssetCounts.set(pkg.slug, cards.length);
+    }
+
+    if (!incremental) {
+      const overviewMarkdowns = await readOverviewMarkdowns(
+        projectRoot,
+        model.modules,
+        model.packages.map((p) => p.slug)
+      );
+      archLog.info("start-init: semantic chunking for overviews", {
+        overviewDocs: overviewMarkdowns.size,
+      });
+      const overviewChunks = await buildAllChunks(config, model, overviewMarkdowns);
+      if (overviewChunks.length > 0) {
+        const overviewEmbeddings = await embedTexts(
+          config,
+          overviewChunks.map((c) => c.text)
+        );
+        store.upsertChunks(
+          overviewChunks.map((c, i) => ({ meta: c, embedding: overviewEmbeddings[i]! }))
+        );
+      }
+
+      allChunks.push(...overviewChunks);
+    }
   } finally {
     store.close();
   }
 
-  const updatedIndex = await attachChunksToIndex(projectRoot, chunks);
-  await writeIndexMd(projectRoot, updatedIndex);
+  if (!incremental) {
+    const modelWithAssets = { ...model, assetCards: allAssetCards };
+    await writeMarkdownTree(projectRoot, modelWithAssets);
+    const updatedIndex = await attachChunksToIndex(projectRoot, allChunks);
+    await writeIndexMd(projectRoot, updatedIndex);
+  } else if (allChunks.length > 0) {
+    const affectedPrefixes = [
+      ...[...affectedModules].map((slug) => `backend/${slug}`),
+      ...[...affectedPackages].map((slug) => `frontend/${slug}`),
+    ];
+    const updatedIndex = await mergeIncrementalChunksToIndex(
+      projectRoot,
+      allChunks,
+      affectedPrefixes
+    );
+    await writeIndexMd(projectRoot, updatedIndex);
+  }
+
+  const commit = getCurrentCommit(projectRoot);
+  const branch = getCurrentBranch(projectRoot);
+  await writeLastScan(
+    projectRoot,
+    buildLastScanState(
+      projectRoot,
+      previousScan,
+      model.modules,
+      model.packages,
+      packageDirs,
+      moduleAssetCounts,
+      packageAssetCounts,
+      commit,
+      branch
+    )
+  );
 
   archLog.info("start-init: done", {
-    chunkCount: chunks.length,
+    chunkCount: allChunks.length,
     apiCount: model.apis.length,
     moduleCount: model.modules.length,
+    assetCardCount: allAssetCards.length,
+    incremental,
   });
 
   return {
     status: "ok",
-    chunkCount: chunks.length,
+    chunkCount: allChunks.length,
     apiCount: model.apis.length,
     moduleCount: model.modules.length,
   };

@@ -22,7 +22,7 @@ describe("java scanner", () => {
     expect(javaModule?.path).toBe("");
   });
 
-  it("scanJavaSources finds POST /auth/login api and feign user-service rpc", async () => {
+  it("scanJavaSources finds POST /auth/login api and feign UserClient rpc", async () => {
     const modules = await findMavenModules(javaModuleRoot);
     const { apis, rpcs } = await scanJavaSources(javaModuleRoot, modules);
 
@@ -35,11 +35,12 @@ describe("java scanner", () => {
     expect(login?.id).toBe("POST-/auth/login");
     expect(login?.audience).toBe("frontend-facing");
 
-    const userService = rpcs.find((r) => r.name === "user-service");
-    expect(userService).toBeDefined();
-    expect(userService?.id).toBe("feign-user-service");
-    expect(userService?.source).toBe("java");
-    expect(userService?.moduleSlug).toBe("java-module");
-    expect(userService?.summary).toBe("Feign client user-service");
+    const userClient = rpcs.find((r) => r.name === "UserClient");
+    expect(userClient).toBeDefined();
+    expect(userClient?.id).toBe("feign-UserClient");
+    expect(userClient?.source).toBe("java");
+    expect(userClient?.moduleSlug).toBe("java-module");
+    expect(userClient?.summary).toContain("UserClient");
+    expect(userClient?.summary).toContain("user-service");
   });
 });

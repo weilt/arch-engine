@@ -7,6 +7,7 @@ import { appendMissing, findContract, readDb, upsertContract } from "./db.js";
 import { getProjectRoot, resolveTsPath } from "./paths.js";
 import { regenerateIndexMd } from "./index-md.js";
 import { handleQueryArch, handleSearchArch } from "./arch-query.js";
+import { handleRegisterAsset, REGISTER_ASSET_KINDS } from "./register-asset.js";
 
 const projectRoot = getProjectRoot();
 
@@ -146,6 +147,41 @@ server.tool(
 );
 
 server.tool(
+  "register_asset",
+  "Register an architecture asset (component, util, enum, API, etc.) for semantic search",
+  {
+    kind: z.enum(REGISTER_ASSET_KINDS),
+    name: z.string(),
+    module: z.string().describe('Module slug, e.g. "base-common" or "ui"'),
+    sourcePath: z.string().describe("Source file path relative to project root"),
+    summary: z.string(),
+    whenToUse: z.string(),
+    howToUse: z.string(),
+    exports: z.array(z.string()).optional(),
+    related: z.array(z.string()).optional(),
+    tags: z.array(z.string()).optional(),
+  },
+  async (input) => {
+    try {
+      const result = await handleRegisterAsset(projectRoot, input);
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: JSON.stringify(result, null, 2),
+          },
+        ],
+      };
+    } catch (err) {
+      return {
+        content: [{ type: "text" as const, text: String(err) }],
+        isError: true,
+      };
+    }
+  }
+);
+
+server.tool(
   "search_arch",
   "Semantic search architecture",
   {
@@ -154,7 +190,9 @@ server.tool(
     filter: z
       .object({ kind: z.string().optional() })
       .optional()
-      .describe('Optional kind filter: "api", "rpc", "component", "module"'),
+      .describe(
+        'Optional kind filter: "api", "rpc", "component", "util", "enum", "starter", "pojo", "module"'
+      ),
   },
   async ({ query, limit, filter }) => {
     try {

@@ -17,6 +17,7 @@ export const DEFAULT_CONFIG: ArchConfig = {
     strategy: "semantic-only",
   },
   apiSpecGlobs: ["docs/**/*.json", "**/openapi.json", "**/swagger.json"],
+  designSystemPackages: [],
   scanners: { java: true, frontend: true },
 };
 
