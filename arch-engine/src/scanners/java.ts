@@ -3,6 +3,19 @@ import path from "node:path";
 import fg from "fast-glob";
 import type { ApiEndpoint, JavaModule, RpcEndpoint } from "../types.js";
 import { parseFeignInterface } from "./java-feign.js";
+import {
+  applyPathRulesToEndpointPath,
+  extractJavaPackage,
+  resolveJavaPathRules,
+  type ResolvedJavaPathRules,
+} from "./java-path-rules.js";
+
+export {
+  resolveJavaPathRules,
+  type ResolvedJavaPathRules,
+  type ControllerPathPrefixRule,
+} from "./java-path-rules.js";
+export { antPackageMatch, applyPathRulesToEndpointPath } from "./java-path-rules.js";
 
 export { discoverJavaCandidates } from "./java-assets.js";
 export {
@@ -44,8 +57,10 @@ function buildRpcSummary(feign: ReturnType<typeof parseFeignInterface>): string 
 
 export async function scanJavaSources(
   projectRoot: string,
-  modules: JavaModule[]
+  modules: JavaModule[],
+  pathRules?: ResolvedJavaPathRules
 ): Promise<{ apis: ApiEndpoint[]; rpcs: RpcEndpoint[] }> {
+  const rules = pathRules ?? (await resolveJavaPathRules(projectRoot));
   const apis: ApiEndpoint[] = [];
   const rpcs: RpcEndpoint[] = [];
   const seenRpc = new Set<string>();
@@ -74,9 +89,11 @@ export async function scanJavaSources(
       let classBase = "";
       const cm = content.match(CLASS_MAPPING_RE);
       if (cm) classBase = cm[1];
+      const pkg = extractJavaPackage(content);
       for (const m of content.matchAll(MAPPING_RE)) {
         const method = m[1].toUpperCase();
-        const p = `${classBase}${m[2]}`.replace("//", "/");
+        const raw = `${classBase}${m[2]}`.replace("//", "/");
+        const p = applyPathRulesToEndpointPath(rules, pkg, raw);
         apis.push({
           id: `${method}-${p}`,
           method,

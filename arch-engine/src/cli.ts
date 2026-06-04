@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import path from "node:path";
 import { setArchLogVerbose } from "./log.js";
 import { runStartInit } from "./pipeline.js";
 
@@ -19,8 +20,13 @@ function isConfigError(message: string): boolean {
   return message.includes("JSON") || message.includes("config");
 }
 
+function resolveProjectRoot(): string {
+  const args = process.argv.slice(2).filter((a) => !a.startsWith("-"));
+  return args[0] ? path.resolve(args[0]) : process.cwd();
+}
+
 async function main(): Promise<void> {
-  const root = process.cwd();
+  const root = resolveProjectRoot();
   const full = process.argv.includes("--full");
   const report = await runStartInit(root, {}, { full });
 

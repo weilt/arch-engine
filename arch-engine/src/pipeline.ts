@@ -28,6 +28,7 @@ import {
   isStarterModule,
   scanJavaSources,
 } from "./scanners/java.js";
+import { resolveJavaPathRules } from "./scanners/java-path-rules.js";
 import { mergeDocumentModel } from "./scanners/merge.js";
 import { scanOpenApiGlobs } from "./scanners/openapi.js";
 import type {
@@ -351,8 +352,21 @@ export async function runStartInit(
 
   archLog.info("start-init: scanning project");
   const modules = config.scanners.java ? await findMavenModules(projectRoot) : [];
+  let javaPathRules: Awaited<ReturnType<typeof resolveJavaPathRules>> | undefined;
+  if (config.scanners.java) {
+    javaPathRules = await resolveJavaPathRules(projectRoot);
+    archLog.info("start-init: java path rules", {
+      confidence: javaPathRules.confidence,
+      contextPath: javaPathRules.contextPath || "(none)",
+      prefixCount: javaPathRules.controllerPrefixes.length,
+      prefixes: javaPathRules.controllerPrefixes.map((r) => ({
+        prefix: r.prefix,
+        pattern: r.controllerPattern,
+      })),
+    });
+  }
   const { apis: javaApis, rpcs } = config.scanners.java
-    ? await scanJavaSources(projectRoot, modules)
+    ? await scanJavaSources(projectRoot, modules, javaPathRules)
     : { apis: [], rpcs: [] };
   const openApis = await scanOpenApiGlobs(projectRoot, config.apiSpecGlobs);
   const packages = config.scanners.frontend ? await scanFrontend(projectRoot) : [];

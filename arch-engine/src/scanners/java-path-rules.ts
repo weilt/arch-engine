@@ -1,0 +1,378 @@
+import fs from "node:fs/promises";
+import path from "node:path";
+import fg from "fast-glob";
+import YAML from "yaml";
+
+/** One controller-package → URL prefix rule (Spring PathMatch / WebMvcRegistrations). */
+export interface ControllerPathPrefixRule {
+  prefix: string;
+  /** Ant-style pattern with `.` as separator, e.g. `**.controller.admin.**` */
+  controllerPattern: string;
+  source: string;
+}
+
+export interface ResolvedJavaPathRules {
+  contextPath: string;
+  controllerPrefixes: ControllerPathPrefixRule[];
+  /** high = WebProperties-style rules; medium = yml only; low = partial / fallback */
+  confidence: "high" | "medium" | "low";
+  sources: string[];
+}
+
+const WEB_MVC_REGISTRATIONS_RE = /WebMvcRegistrations/;
+const CONFIG_PROPERTIES_RE =
+  /@ConfigurationProperties\s*\(\s*prefix\s*=\s*["']([^"']+)["']/;
+
+/** `private Api adminApi = new Api("/admin-api", "**.controller.admin.**");` */
+const API_FIELD_DEFAULT_RE =
+  /(?:private|protected)\s+Api\s+(\w+)\s*=\s*new\s+Api\s*\(\s*["']([^"']+)["']\s*,\s*["']([^"']+)["']\s*\)/g;
+
+/** `pathPrefixes.put("/admin-api",` or `addPathPrefix("/admin-api",` */
+const INLINE_PREFIX_RE =
+  /(?:pathPrefixes\.put|addPathPrefix)\s*\(\s*["']([^"']+)["']/g;
+
+/** `webProperties.getAdminApi()` → field name adminApi */
+const GETTER_TO_FIELD_RE = /(\w+Properties)\.get(\w+)\(\)/g;
+
+function normalizeUrlPath(...segments: string[]): string {
+  const joined = segments
+    .filter(Boolean)
+    .join("/")
+    .replace(/\/+/g, "/");
+  if (!joined.startsWith("/")) return `/${joined}`;
+  return joined.replace(/\/$/, "") || "/";
+}
+
+/**
+ * Approximate Spring AntPathMatcher (`.` separator) for Java package names.
+ * Handles Yudao-style `**.controller.admin.**` including leaf packages without a trailing segment.
+ */
+export function antPackageMatch(pattern: string, packageName: string): boolean {
+  if (pattern.startsWith("**.") && pattern.endsWith(".**")) {
+    const core = pattern.slice(3, -3);
+    if (core && !core.includes("*")) {
+      return (
+        packageName === core ||
+        packageName.endsWith(`.${core}`) ||
+        packageName.includes(`.${core}.`)
+      );
+    }
+  }
+
+  const parts = pattern.split(".");
+  let re = "^";
+  for (let i = 0; i < parts.length; i++) {
+    const seg = parts[i]!;
+    if (i > 0) re += "\\.";
+    if (seg === "**") {
+      re += "(?:[^.]*\\.)*[^.]*";
+    } else if (seg === "*") {
+      re += "[^.]*";
+    } else {
+      re += seg.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    }
+  }
+  re += "$";
+  return new RegExp(re).test(packageName);
+}
+
+export function prefixForControllerPackage(
+  rules: ResolvedJavaPathRules,
+  packageName: string | undefined
+): string {
+  if (!packageName) return rules.contextPath;
+  for (const rule of rules.controllerPrefixes) {
+    if (antPackageMatch(rule.controllerPattern, packageName)) {
+      return normalizeUrlPath(rules.contextPath, rule.prefix);
+    }
+  }
+  return rules.contextPath;
+}
+
+export function applyPathRulesToEndpointPath(
+  rules: ResolvedJavaPathRules,
+  packageName: string | undefined,
+  annotationPath: string
+): string {
+  const base = prefixForControllerPackage(rules, packageName);
+  const rel = annotationPath.startsWith("/") ? annotationPath : `/${annotationPath}`;
+  if (base === "/" || base === "") return normalizeUrlPath(rel);
+  return normalizeUrlPath(base, rel);
+}
+
+function parseApiFieldDefaults(content: string): Map<string, { prefix: string; pattern: string }> {
+  const map = new Map<string, { prefix: string; pattern: string }>();
+  for (const m of content.matchAll(API_FIELD_DEFAULT_RE)) {
+    map.set(m[1]!, { prefix: m[2]!, pattern: m[3]! });
+  }
+  return map;
+}
+
+function fieldNameFromGetter(getter: string): string {
+  const name = getter.charAt(0).toLowerCase() + getter.slice(1);
+  return name;
+}
+
+function findReferencedPropertiesClass(
+  webMvcFileContent: string,
+  projectRoot: string
+): string | null {
+  const enableMatch = webMvcFileContent.match(
+    /@EnableConfigurationProperties\s*\(\s*(\w+)\.class\s*\)/
+  );
+  if (enableMatch) return enableMatch[1]!;
+
+  const paramMatch = webMvcFileContent.match(
+    /WebMvcRegistrations\s+\w+\s*\(\s*(\w+)\s+\w+\s*\)/
+  );
+  if (paramMatch) return paramMatch[1]!;
+
+  if (webMvcFileContent.includes("WebProperties")) return "WebProperties";
+
+  return null;
+}
+
+async function findJavaFileByClassName(
+  projectRoot: string,
+  className: string
+): Promise<string | null> {
+  const hits = await fg.glob(`**/${className}.java`, {
+    cwd: projectRoot,
+    absolute: true,
+    ignore: ["**/target/**", "**/node_modules/**"],
+  });
+  return hits[0] ?? null;
+}
+
+function parseYmlFlat(root: unknown, prefix: string): Record<string, string> {
+  const out: Record<string, string> = {};
+  if (!root || typeof root !== "object") return out;
+
+  function walk(obj: Record<string, unknown>, keys: string[]) {
+    for (const [k, v] of Object.entries(obj)) {
+      const next = [...keys, k];
+      const pathKey = next.join(".");
+      if (typeof v === "string" || typeof v === "number") {
+        if (pathKey.startsWith(prefix)) out[pathKey] = String(v);
+      } else if (v && typeof v === "object" && !Array.isArray(v)) {
+        walk(v as Record<string, unknown>, next);
+      }
+    }
+  }
+  walk(root as Record<string, unknown>, []);
+  return out;
+}
+
+async function loadYamlConfigKeys(
+  projectRoot: string,
+  configPrefix: string
+): Promise<Record<string, string>> {
+  const files = await fg.glob(
+    ["**/application.yml", "**/application.yaml", "**/application-*.yml", "**/application-*.yaml"],
+    {
+      cwd: projectRoot,
+      absolute: true,
+      ignore: ["**/target/**", "**/node_modules/**"],
+    }
+  );
+
+  const merged: Record<string, string> = {};
+  for (const file of files.slice(0, 20)) {
+    try {
+      const raw = await fs.readFile(file, "utf-8");
+      const doc = YAML.parse(raw) as unknown;
+      const flat = parseYmlFlat(doc, configPrefix);
+      Object.assign(merged, flat);
+    } catch {
+      /* skip invalid yaml */
+    }
+  }
+  return merged;
+}
+
+function applyYmlOverridesToRules(
+  rules: ControllerPathPrefixRule[],
+  ymlFlat: Record<string, string>,
+  configPrefix: string
+): ControllerPathPrefixRule[] {
+  const byField = new Map<string, ControllerPathPrefixRule>();
+  for (const r of rules) {
+    const fieldMatch = r.source.match(/field:(\w+)/);
+    if (fieldMatch) byField.set(fieldMatch[1]!, r);
+  }
+
+  const updated: ControllerPathPrefixRule[] = [];
+  for (const rule of rules) {
+    const fieldMatch = rule.source.match(/field:(\w+)/);
+    if (!fieldMatch) {
+      updated.push(rule);
+      continue;
+    }
+    const field = fieldMatch[1]!;
+    const ymlSegment = field.endsWith("Api")
+      ? `${field
+          .slice(0, -3)
+          .replace(/([A-Z])/g, "-$1")
+          .toLowerCase()
+          .replace(/^-/, "")}-api`
+      : field.replace(/([A-Z])/g, "-$1").toLowerCase();
+    const prefixKey = `${configPrefix}.${ymlSegment}.prefix`;
+    const controllerKey = `${configPrefix}.${ymlSegment}.controller`;
+    const altPrefixKey = `${configPrefix}.${field}.prefix`;
+    const altControllerKey = `${configPrefix}.${field}.controller`;
+
+    const prefix =
+      ymlFlat[prefixKey] ?? ymlFlat[altPrefixKey] ?? rule.prefix;
+    const controllerPattern =
+      ymlFlat[controllerKey] ?? ymlFlat[altControllerKey] ?? rule.controllerPattern;
+
+    updated.push({
+      ...rule,
+      prefix,
+      controllerPattern,
+      source: `${rule.source}+yml`,
+    });
+  }
+  return updated;
+}
+
+async function resolveContextPath(projectRoot: string): Promise<string> {
+  const yml = await loadYamlConfigKeys(projectRoot, "server");
+  const ctx =
+    yml["server.servlet.context-path"] ??
+    yml["server.servlet.contextPath"] ??
+    "";
+  if (!ctx || ctx === "/") return "";
+  return ctx.startsWith("/") ? ctx.replace(/\/$/, "") : `/${ctx}`.replace(/\/$/, "");
+}
+
+function rulesFromPropertiesJava(
+  content: string,
+  className: string,
+  file: string
+): ControllerPathPrefixRule[] {
+  const defaults = parseApiFieldDefaults(content);
+  const rules: ControllerPathPrefixRule[] = [];
+  for (const [field, { prefix, pattern }] of defaults) {
+    rules.push({
+      prefix,
+      controllerPattern: pattern,
+      source: `${className}:field:${field}`,
+    });
+  }
+
+  if (rules.length === 0) {
+    const prefixOnly = [...content.matchAll(/["'](\/[\w-]+-api)["']/g)].map((m) => m[1]!);
+    const unique = [...new Set(prefixOnly)];
+    for (const p of unique) {
+      if (p.includes("admin")) {
+        rules.push({
+          prefix: p,
+          controllerPattern: "**.controller.admin.**",
+          source: `${className}:heuristic`,
+        });
+      } else if (p.includes("app")) {
+        rules.push({
+          prefix: p,
+          controllerPattern: "**.controller.app.**",
+          source: `${className}:heuristic`,
+        });
+      } else if (p.includes("pc")) {
+        rules.push({
+          prefix: p,
+          controllerPattern: "**.controller.pc.**",
+          source: `${className}:heuristic`,
+        });
+      }
+    }
+  }
+
+  return rules.map((r) => ({ ...r, source: `${file} ${r.source}` }));
+}
+
+function rulesFromInlineWebMvc(content: string, file: string): ControllerPathPrefixRule[] {
+  const rules: ControllerPathPrefixRule[] = [];
+  for (const m of content.matchAll(INLINE_PREFIX_RE)) {
+    const prefix = m[1]!;
+    let pattern = "**.controller.**";
+    if (prefix.includes("admin")) pattern = "**.controller.admin.**";
+    else if (prefix.includes("app")) pattern = "**.controller.app.**";
+    else if (prefix.includes("pc")) pattern = "**.controller.pc.**";
+    rules.push({ prefix, controllerPattern: pattern, source: `${file}:inline` });
+  }
+  return rules;
+}
+
+/**
+ * Discover WebMvcRegistrations (and related config), resolve URL prefix rules for controllers.
+ */
+export async function resolveJavaPathRules(
+  projectRoot: string
+): Promise<ResolvedJavaPathRules> {
+  const sources: string[] = [];
+  let controllerPrefixes: ControllerPathPrefixRule[] = [];
+  let confidence: ResolvedJavaPathRules["confidence"] = "low";
+
+  const webMvcFiles = await fg.glob("**/*.java", {
+    cwd: projectRoot,
+    absolute: true,
+    ignore: ["**/target/**", "**/node_modules/**"],
+  });
+
+  const registrationFiles: string[] = [];
+  for (const file of webMvcFiles) {
+    const content = await fs.readFile(file, "utf-8");
+    if (WEB_MVC_REGISTRATIONS_RE.test(content)) {
+      registrationFiles.push(file);
+    }
+  }
+
+  for (const file of registrationFiles) {
+    const content = await fs.readFile(file, "utf-8");
+    sources.push(file);
+
+    const propsClassName = findReferencedPropertiesClass(content, projectRoot);
+    if (propsClassName) {
+      const propsFile = await findJavaFileByClassName(projectRoot, propsClassName);
+      if (propsFile) {
+        const propsContent = await fs.readFile(propsFile, "utf-8");
+        const cpMatch = propsContent.match(CONFIG_PROPERTIES_RE);
+        const configPrefix = cpMatch?.[1];
+
+        let rules = rulesFromPropertiesJava(propsContent, propsClassName, propsFile);
+        if (configPrefix) {
+          const ymlFlat = await loadYamlConfigKeys(projectRoot, configPrefix);
+          rules = applyYmlOverridesToRules(rules, ymlFlat, configPrefix);
+        }
+
+        if (rules.length > 0) {
+          controllerPrefixes = rules;
+          confidence = "high";
+        }
+      }
+    }
+
+    if (controllerPrefixes.length === 0) {
+      const inline = rulesFromInlineWebMvc(content, file);
+      if (inline.length > 0) {
+        controllerPrefixes = inline;
+        confidence = "medium";
+      }
+    }
+  }
+
+  const contextPath = await resolveContextPath(projectRoot);
+  if (contextPath) sources.push(`context-path:${contextPath}`);
+
+  return {
+    contextPath,
+    controllerPrefixes,
+    confidence,
+    sources,
+  };
+}
+
+export function extractJavaPackage(content: string): string | undefined {
+  const m = content.match(/^\s*package\s+([\w.]+)\s*;/m);
+  return m?.[1];
+}

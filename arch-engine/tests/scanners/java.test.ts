@@ -43,4 +43,15 @@ describe("java scanner", () => {
     expect(userClient?.summary).toContain("UserClient");
     expect(userClient?.summary).toContain("user-service");
   });
+
+  it("scanJavaSources applies WebMvc path prefix for controller.admin package", async () => {
+    const modules = await findMavenModules(javaModuleRoot);
+    const { apis } = await scanJavaSources(javaModuleRoot, modules);
+
+    const adminHello = apis.find(
+      (a) => a.method === "GET" && a.path === "/admin-api/demo/hello"
+    );
+    expect(adminHello).toBeDefined();
+    expect(adminHello?.source).toBe("java");
+  });
 });
