@@ -123,7 +123,7 @@ chmod +x scripts/install.sh
 
 1. 构建并测试 `arch-engine`、`mcp-server`
 2. 部署到 `~/.apt/`（Windows：`%USERPROFILE%\.apt\`）
-3. 合并 MCP 配置到 `~/.claude/settings.json`
+3. 合并 MCP 配置到 Cursor `mcp.json` 与 Claude Code `~/.claude.json`（**不是** `settings.json`）
 4. 将 `~/.apt/bin` 加入 PATH（含 `agent-init`、`start-init`）
 
 安装完成后**重启终端**（Windows 建议重启 Claude Code）。
@@ -403,9 +403,40 @@ export enum OrderStatus { Pending, Paid, Shipped }
 
 正常。编辑 `.ai/arch/arch.config.json` 或 `arch.secrets.json` 填入 API Key，再执行 `start-init`。
 
-### MCP 工具列表里没有 `search_arch`？
+### MCP 工具列表里没有 `search_arch`？（Claude Code）
 
-重启 Claude Code；确认 `~/.claude/settings.json` 已包含 `agent-protocol-mcp` 指向 `~/.apt/mcp-server/dist/index.js`。
+Claude Code **不会**读取 `~/.claude/settings.json` 里的 `mcpServers`（写了也静默忽略）。正确位置：
+
+| 客户端 | MCP 配置文件 |
+|--------|----------------|
+| **Claude Code**（用户级） | `~/.claude.json` 顶层 `mcpServers` |
+| **Claude Code**（项目级） | `~/.claude.json` → `projects["<路径>"].mcpServers`，或项目根 `.mcp.json` |
+| **Cursor** | `~/.cursor/mcp.json` |
+
+全局注册（install 已做，或手动）：
+
+```powershell
+claude mcp add agent-protocol-mcp -s user -- node $env:USERPROFILE\.apt\mcp-server\dist\index.js
+claude mcp list   # 应显示 ✓ Connected
+```
+
+然后在**业务项目根**执行 `agent-init`，再在该目录打开 Claude Code。
+
+然后**新开一个 Claude Code 会话**，运行 `/mcp` 确认工具列表含 `search_arch`、`query_contract` 等。
+
+### Cursor 里 `/finish-feature` 提示「MCP contract registration is not available」？
+
+说明当前会话未加载 APT MCP。安装后执行 `.\scripts\merge-mcp-config.ps1`（或 `install.ps1`），在 `%USERPROFILE%\.cursor\mcp.json` 中应出现 `agent-protocol-mcp`，**重启 Cursor**，并在 MCP 列表中确认有 `register_contract` / `register_asset`。
+
+### MCP 是全局的还是按项目的？
+
+| 步骤 | 作用 |
+|------|------|
+| **`install.ps1`** | 全局注册 MCP（Claude Code `user` 作用域 + Cursor `mcp.json`），**所有项目**可用 |
+| **`agent-init`**（每个项目根） | 注入斜杠命令、初始化 `.ai/db.json`、写入项目根 `.mcp.json`（团队可入库） |
+| **`start-init`**（每个项目根） | 扫描架构生成 `.ai/arch/`（与 MCP 注册无关） |
+
+在业务项目里开发时，用该项目文件夹作为工作区打开即可；MCP 通过 `process.cwd()` 读当前项目的 `.ai/`。若必须在工具仓目录里操作业务数据，可手动设 `APT_PROJECT_ROOT` 环境变量（高级用法）。
 
 ### `Missing API key for embedding`？
 

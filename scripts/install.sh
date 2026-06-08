@@ -3,8 +3,8 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 APT_HOME="${APT_HOME:-$HOME/.apt}"
-CLAUDE_SETTINGS="$HOME/.claude/settings.json"
 MCP_ENTRY="$APT_HOME/mcp-server/dist/index.js"
+SCRIPTS_DIR="$APT_HOME/scripts"
 
 command -v node >/dev/null || { echo "Node.js 18+ required"; exit 1; }
 
@@ -15,7 +15,7 @@ echo "Building MCP server..."
 (cd "$REPO_ROOT/mcp-server" && npm ci && npm run build && npm test)
 
 echo "Deploying to $APT_HOME..."
-mkdir -p "$APT_HOME/arch-engine/dist" "$APT_HOME/mcp-server/dist" "$APT_HOME/templates" "$APT_HOME/bin"
+mkdir -p "$APT_HOME/arch-engine/dist" "$APT_HOME/mcp-server/dist" "$APT_HOME/templates" "$APT_HOME/bin" "$SCRIPTS_DIR"
 rm -rf "$APT_HOME/arch-engine/dist"
 cp -R "$REPO_ROOT/arch-engine/dist" "$APT_HOME/arch-engine/"
 cp "$REPO_ROOT/arch-engine/package.json" "$APT_HOME/arch-engine/"
@@ -28,30 +28,23 @@ cp "$REPO_ROOT/mcp-server/package-lock.json" "$APT_HOME/mcp-server/"
 (cd "$APT_HOME/mcp-server" && npm ci --omit=dev)
 cp -R "$REPO_ROOT/templates/." "$APT_HOME/templates/"
 cp "$REPO_ROOT/bin/"* "$APT_HOME/bin/"
+cp "$REPO_ROOT/scripts/merge-mcp-config.js" "$REPO_ROOT/scripts/write-project-mcp-json.js" "$SCRIPTS_DIR/"
 cp "$REPO_ROOT/README.md" "$APT_HOME/"
 chmod +x "$APT_HOME/bin/agent-init.sh" "$APT_HOME/bin/start-init.sh"
 
-echo "Merging Claude MCP settings..."
-mkdir -p "$HOME/.claude"
-node -e "
-const fs = require('fs');
-const p = process.argv[1];
-const entry = process.argv[2];
-let s = {};
-try {
-  s = JSON.parse(fs.readFileSync(p, 'utf8'));
-} catch (e) {
-  if (e.code === 'ENOENT') {
-    s = {};
-  } else {
-    fs.copyFileSync(p, p + '.bak');
-    throw new Error('Invalid settings.json backed up to settings.json.bak');
-  }
-}
-s.mcpServers = s.mcpServers || {};
-s.mcpServers['agent-protocol-mcp'] = { command: 'node', args: [entry] };
-fs.writeFileSync(p, JSON.stringify(s, null, 2));
-" "$CLAUDE_SETTINGS" "$MCP_ENTRY"
+echo "Registering MCP globally (Claude Code + Cursor)..."
+CURSOR_MCP="$HOME/.cursor/mcp.json"
+mkdir -p "$(dirname "$CURSOR_MCP")"
+node "$SCRIPTS_DIR/merge-mcp-config.js" "$CURSOR_MCP" "$MCP_ENTRY" "mcpServers" "-"
+echo "OK Cursor -> $CURSOR_MCP"
+
+if command -v claude >/dev/null 2>&1; then
+  claude mcp remove agent-protocol-mcp -s user 2>/dev/null || true
+  claude mcp add agent-protocol-mcp -s user -- node "$MCP_ENTRY"
+  echo "OK Claude Code (user scope, all projects)"
+else
+  echo "WARN: claude CLI not found. Run: claude mcp add agent-protocol-mcp -s user -- node $MCP_ENTRY"
+fi
 
 LINE='export PATH="$HOME/.apt/bin:$PATH"'
 for rc in "$HOME/.bashrc" "$HOME/.zshrc"; do
@@ -60,4 +53,4 @@ for rc in "$HOME/.bashrc" "$HOME/.zshrc"; do
 done
 
 echo "✅ APT installed to $APT_HOME"
-echo "   Restart your shell, then run: agent-init && start-init"
+echo "   Per project: agent-init (then start-init for arch scan)"

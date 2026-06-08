@@ -1,6 +1,10 @@
 import path from "node:path";
 
 export function getProjectRoot(cwd: string = process.cwd()): string {
+  const fromEnv = process.env.APT_PROJECT_ROOT?.trim();
+  if (fromEnv) {
+    return path.resolve(fromEnv);
+  }
   return cwd;
 }
 

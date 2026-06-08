@@ -39,10 +39,14 @@ function assertValidDb(data: unknown): AptDb {
   };
 }
 
+function stripUtf8Bom(text: string): string {
+  return text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
+}
+
 export async function readDb(projectRoot: string): Promise<AptDb> {
   const dbPath = getDbPath(projectRoot);
   try {
-    const raw = await fs.readFile(dbPath, "utf-8");
+    const raw = stripUtf8Bom(await fs.readFile(dbPath, "utf-8"));
     return assertValidDb(JSON.parse(raw));
   } catch (err: unknown) {
     const code = (err as NodeJS.ErrnoException).code;

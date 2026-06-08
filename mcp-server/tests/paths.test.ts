@@ -1,9 +1,22 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
 import path from "node:path";
-import { getAiDir, getDbPath, resolveTsPath } from "../src/paths.js";
+import { getAiDir, getDbPath, getProjectRoot, resolveTsPath } from "../src/paths.js";
 
 describe("paths", () => {
   const root = "/project";
+
+  afterEach(() => {
+    delete process.env.APT_PROJECT_ROOT;
+  });
+
+  it("getProjectRoot prefers APT_PROJECT_ROOT over cwd", () => {
+    process.env.APT_PROJECT_ROOT = "/business/project";
+    expect(getProjectRoot("/tool/repo")).toBe(path.resolve("/business/project"));
+  });
+
+  it("getProjectRoot falls back to cwd when env unset", () => {
+    expect(getProjectRoot("/tool/repo")).toBe("/tool/repo");
+  });
 
   it("getAiDir returns .ai under cwd", () => {
     expect(getAiDir(root)).toBe(path.join(root, ".ai"));

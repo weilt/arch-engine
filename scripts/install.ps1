@@ -33,9 +33,11 @@ try {
 Write-Host "Deploying to $AptHome..."
 $archTarget = Join-Path $AptHome "arch-engine"
 $mcpTarget = Join-Path $AptHome "mcp-server"
+$scriptsTarget = Join-Path $AptHome "scripts"
 $dirs = @(
   (Join-Path $AptHome "templates"),
   (Join-Path $AptHome "bin"),
+  $scriptsTarget,
   (Join-Path $archTarget "dist"),
   (Join-Path $mcpTarget "dist")
 )
@@ -65,31 +67,12 @@ try {
 
 Copy-Item -Path (Join-Path $RepoRoot "templates\*") -Destination (Join-Path $AptHome "templates") -Force
 Copy-Item -Path (Join-Path $RepoRoot "bin\*") -Destination (Join-Path $AptHome "bin") -Force
+Copy-Item -Path (Join-Path $RepoRoot "scripts\merge-mcp-config.js") -Destination $scriptsTarget -Force
+Copy-Item -Path (Join-Path $RepoRoot "scripts\write-project-mcp-json.js") -Destination $scriptsTarget -Force
 Copy-Item -Path (Join-Path $RepoRoot "README.md") -Destination $AptHome -Force
 
-Write-Host "Merging Claude MCP settings..."
-$claudeDir = Split-Path $ClaudeSettings -Parent
-New-Item -ItemType Directory -Force -Path $claudeDir | Out-Null
-
-node -e "
-const fs = require('fs');
-const p = process.argv[1];
-const entry = process.argv[2];
-let s = {};
-try {
-  s = JSON.parse(fs.readFileSync(p, 'utf8'));
-} catch (e) {
-  if (e.code === 'ENOENT') {
-    s = {};
-  } else {
-    fs.copyFileSync(p, p + '.bak');
-    throw new Error('Invalid settings.json backed up to settings.json.bak');
-  }
-}
-s.mcpServers = s.mcpServers || {};
-s.mcpServers['agent-protocol-mcp'] = { command: 'node', args: [entry] };
-fs.writeFileSync(p, JSON.stringify(s, null, 2));
-" "$ClaudeSettings" "$McpEntry"
+Write-Host "Registering MCP globally (Claude Code + Cursor)..."
+& (Join-Path (Split-Path -Parent $MyInvocation.MyCommand.Path) "merge-mcp-config.ps1")
 
 $binPath = Join-Path $AptHome "bin"
 $userPath = [Environment]::GetEnvironmentVariable("Path", "User")

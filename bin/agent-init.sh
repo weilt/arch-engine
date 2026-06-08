@@ -13,4 +13,10 @@ if [ ! -f "$DB" ]; then
   echo '{"contracts":[],"missingRequests":[]}' > "$DB"
 fi
 
+MCP_ENTRY="$APT_HOME/mcp-server/dist/index.js"
+WRITE_MCP="$APT_HOME/scripts/write-project-mcp-json.js"
+if [ -f "$MCP_ENTRY" ] && [ -f "$WRITE_MCP" ]; then
+  node "$WRITE_MCP" "$TARGET" "$MCP_ENTRY"
+fi
+
 echo "✅ Agent Protocol Toolkit initialized. Commands injected."
