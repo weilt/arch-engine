@@ -2,7 +2,8 @@
 set -euo pipefail
 
 APT_HOME="${APT_HOME:-$HOME/.apt}"
-TARGET="$(pwd)"
+TARGET="${1:-$(pwd)}"
+TARGET="$(cd "$TARGET" && pwd)"
 
 mkdir -p "$TARGET/.claude/commands"
 cp "$APT_HOME/templates/"*.md "$TARGET/.claude/commands/"
