@@ -33,16 +33,30 @@ APT 用四层机制解决这些问题：
 
 运行 `agent-init` 后，在 Claude Code / Cursor 中可用斜杠命令；终端 CLI 与 MCP 工具在全局安装后即可使用（MCP 需在项目根执行 `agent-init` 写入 `APT_PROJECT_ROOT`）。
 
-### 斜杠命令（4）
+### 斜杠命令（6）
 
 | 命令 | 用途 |
 |------|------|
-| **`/feature`** | 单命令全流程：寻址 → 计划 → 实现 → 自动闭环（**推荐**） |
-| **`/start-feature`** | 开发前：依赖寻址与计划（须先经 MCP 查契约/架构/设计） |
-| **`/finish-feature`** | 功能完成后的补救闭环（漏跑 `/feature` 或 `/start-feature` 闭环时用） |
-| **`/design-system`** | 立项定视觉：baoyu-design 定稿后 `design-sync` 沉淀到 `.ai/design/` |
+| **`/plan-from-spec`** | **第三阶段推荐**：从 brainstorming spec 经 MCP 寻址生成双 Part 实现方案（不写代码） |
+| **`/implement-plan`** | 按已批准的 `docs/apt/plans/` 方案编码并自动闭环 |
+| **`/feature`** | 无 spec 时一站式：寻址 → 计划 → 实现 → 闭环 |
+| **`/start-feature`** | 无 spec、仅口头描述时的寻址与计划（legacy） |
+| **`/finish-feature`** | 闭环漏跑补救 |
+| **`/design-system`** | 立项定视觉：`design-sync` 沉淀到 `.ai/design/` |
 
 由 `agent-init` 从 `~/.apt/templates/*.md` 复制到项目 `.claude/commands/`（不含 `_` 开头的内部片段）。
+
+### 第三阶段工作流（有 brainstorming spec 时）
+
+```text
+brainstorming → docs/superpowers/specs/*-design.md
+       ↓
+/plan-from-spec <spec路径>  →  docs/apt/plans/*-plan.md（Part1 技术方案 + Part2 任务清单）
+       ↓ 用户确认，Status → approved
+/implement-plan <plan路径>  →  编码 + 自动闭环
+```
+
+**不用** superpowers `writing-plans`（不读 `.ai/` 索引）。规格见 [apt-plan-from-spec 设计](docs/superpowers/specs/2026-06-17-apt-plan-from-spec-design.md)。
 
 ### 终端 CLI（4）
 
@@ -240,7 +254,7 @@ Windows 可用 `agent-init.cmd`、`start-init.cmd`。
 
 ### `agent-init` 做什么？
 
-- 复制 `/feature`、`/start-feature`、`/finish-feature`、`/design-system` 到 `.claude/commands/`
+- 复制 `/plan-from-spec`、`/implement-plan`、`/feature`、`/start-feature`、`/finish-feature`、`/design-system` 到 `.claude/commands/`
 - 创建 `.ai/db.json`（空契约库）
 - 写入 `.mcp.json` 与 `.cursor/mcp.json`，设置 `APT_PROJECT_ROOT` 指向当前项目（该文件含本机路径，建议 gitignore，勿提交）
 
@@ -482,9 +496,12 @@ export enum OrderStatus { Pending, Paid, Shipped }
 <project>/
 ├── .claude/commands/
 │   ├── feature.md
+│   ├── plan-from-spec.md
+│   ├── implement-plan.md
 │   ├── start-feature.md
 │   ├── finish-feature.md
 │   └── design-system.md
+├── docs/apt/plans/          # /plan-from-spec 产出（双 Part 实现方案）
 ├── .mcp.json              # agent-init 生成（建议 gitignore）
 ├── .cursor/mcp.json         # 同上，含 APT_PROJECT_ROOT
 └── .ai/
@@ -639,6 +656,7 @@ arch-engine/               # GitHub 仓库名（含完整 APT 工具集）
 - [x] `arch.config.json` 启动时必填字段校验
 - [x] Windows / macOS 安装脚本
 - [x] 设计知识层（`.ai/design/`、`design-sync`、设计 MCP 三工具）
+- [x] Spec → Plan → Implement（`/plan-from-spec`、`/implement-plan`，方案 C）
 
 **计划中：**
 
