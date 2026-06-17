@@ -25,11 +25,29 @@ APT 用四层机制解决这些问题：
 | **Custom Commands** | `/feature`（推荐）、`/start-feature`、`/finish-feature` 引导固定流程 |
 | **MCP Server** | `query_contract` / `register_contract` 等工具，代理必须调用 |
 | **架构引擎** | `start-init` 扫描代码，生成可检索的架构文档 + 向量库 |
-| **项目数据** | `.ai/db.json`、`.ai/arch/` 存契约与架构，随项目走 |
+| **项目数据** | `.ai/db.json`、`.ai/arch/`、`.ai/design/` 存契约、架构与设计知识 |
 
 ---
 
 ## 核心能力
+
+### 设计知识层（Design）— 框架无关
+
+立项时用 **baoyu-design**（或其它设计工具）定风格，定稿后 **`design-sync`** 沉淀到 `.ai/design/`。开发子 agent **先查设计、再查 arch**：
+
+- **`query_design`**：全局 tokens + `style.md`，或按 `page` / `component` 精读语义配方
+- **`search_ui`**：关键词搜索语义组件与页面模板
+- **`report_design_gap`**：缺设计定义时阻塞 UI 实现（对标 `report_missing`）
+- **`/design-system`**：引导定风格 → `design-sync`
+- **`/feature` §0.5**：含 UI 的任务自动走设计寻址
+
+```powershell
+# baoyu 定稿后同步（默认读 designs/）
+design-sync --source designs/my-app
+
+# 预览
+design-sync --dry-run
+```
 
 ### 契约管理（Contract）
 

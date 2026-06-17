@@ -6,7 +6,8 @@
   "types": "dist/index.d.ts",
   "bin": {
     "start-init": "dist/cli.js",
-    "sync-changes": "dist/cli-sync.js"
+    "sync-changes": "dist/cli-sync.js",
+    "design-sync": "dist/cli-design-sync.js"
   },
   "exports": {
     ".": "./dist/index.js"

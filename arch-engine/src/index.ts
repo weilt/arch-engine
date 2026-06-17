@@ -111,3 +111,39 @@ export {
 } from "./sync/run.js";
 
 export { readLastScan, writeLastScan } from "./incremental/last-scan.js";
+
+export {
+  getDesignDir,
+  getDesignProfilePath,
+} from "./design/paths.js";
+
+export {
+  MissingDesignProfileError,
+  DesignComponentNotFoundError,
+  DesignPageNotFoundError,
+  InvalidDesignIdError,
+} from "./design/errors.js";
+
+export {
+  queryDesign,
+  searchUi,
+  appendDesignGap,
+  readDesignProfile,
+} from "./design/query.js";
+
+export {
+  runDesignSync,
+  type DesignSyncOptions,
+  type DesignSyncReport,
+} from "./design/sync.js";
+
+export type {
+  DesignProfile,
+  DesignComponentCard,
+  DesignPageRecipe,
+  QueryDesignOptions,
+  QueryDesignResult,
+  SearchUiOptions,
+  SearchUiHit,
+  DesignGapRequest,
+} from "./design/types.js";

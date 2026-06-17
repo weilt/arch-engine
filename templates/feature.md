@@ -11,6 +11,18 @@ model: sonnet
 
 分析任务，列出开发所需的每一个依赖（接口、组件、类、工具、枚举、API 等），写出名称即可。
 
+## 0.5 设计寻址（本任务含前端 UI 时必须）
+
+在 §1 之前执行。禁止臆造色值/字号/圆角；禁止未经 MCP 直接读 `.ai/design/`。
+
+1. **`query_design`**（`scope: "global"`）— 记录 tokens 与 `style.md` 约束。
+2. **`query_design`**（`page: <本页 slug>`）— 读页面配方；若无，**`search_ui`** 找最接近的页面/组件模板。
+3. 列出本页需要的**语义组件**，逐个 **`query_design`**（`component: <id>`）。
+4. 若缺组件/页面定义 → **`report_design_gap`**，**停止 UI 实现**（可先写接口与纯逻辑）。
+5. 无 `framework-bindings.json` 时：用 tokens + 语义结构实现；有则优先用映射库。
+
+无 `.ai/design/profile.json` 时：报告需先执行 `design-sync` 或 `/design-system`。
+
 ## 1. 依赖寻址（对每个依赖强制执行）
 
 对列表中的**每一项**，按下面顺序查找，**前一步命中即停止**，禁止臆造类型，禁止未经 MCP 直接打开 `.ai/` 下的文件：

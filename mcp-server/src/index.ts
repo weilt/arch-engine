@@ -12,6 +12,9 @@ import { handleAuditArchChanges } from "./audit-changes.js";
 import { handleRefreshAsset, REFRESH_ASSET_KINDS } from "./refresh-asset.js";
 import { handleRemoveAsset } from "./remove-asset.js";
 import { handleSyncArchChanges } from "./sync-changes.js";
+import { handleQueryDesign } from "./design-query.js";
+import { handleSearchUi } from "./design-search.js";
+import { handleReportDesignGap } from "./design-gap.js";
 
 const projectRoot = getProjectRoot();
 
@@ -300,6 +303,78 @@ server.tool(
     } catch (err) {
       return {
         content: [{ type: "text" as const, text: `❌ ${String(err)}` }],
+        isError: true,
+      };
+    }
+  }
+);
+
+server.tool(
+  "query_design",
+  "Query project design profile: global tokens/style, page recipe, or semantic component",
+  {
+    scope: z.literal("global").optional().describe('Use "global" for tokens and style.md'),
+    page: z.string().optional().describe("Page recipe slug, e.g. user-settings"),
+    component: z.string().optional().describe("Semantic component id, e.g. PrimaryButton"),
+  },
+  async ({ scope, page, component }) => {
+    try {
+      const result = await handleQueryDesign(projectRoot, { scope, page, component });
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+      };
+    } catch (err) {
+      return {
+        content: [{ type: "text" as const, text: `❌ ${String(err)}` }],
+        isError: true,
+      };
+    }
+  }
+);
+
+server.tool(
+  "search_ui",
+  "Search semantic UI components and page recipes in .ai/design/",
+  {
+    query: z.string().describe("Natural language or keyword query"),
+    limit: z.number().optional().describe("Max results (default 5)"),
+    filter: z
+      .object({ kind: z.enum(["component", "page"]).optional() })
+      .optional()
+      .describe("Limit to components or pages"),
+  },
+  async ({ query, limit, filter }) => {
+    try {
+      const results = await handleSearchUi(projectRoot, { query, limit, filter });
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify(results, null, 2) }],
+      };
+    } catch (err) {
+      return {
+        content: [{ type: "text" as const, text: `❌ ${String(err)}` }],
+        isError: true,
+      };
+    }
+  }
+);
+
+server.tool(
+  "report_design_gap",
+  "Report missing design definition and block UI implementation",
+  {
+    need: z.string().describe("Missing semantic component or page pattern"),
+    reason: z.string(),
+    page: z.string().optional().describe("Page slug context"),
+  },
+  async ({ need, reason, page }) => {
+    try {
+      const text = await handleReportDesignGap(projectRoot, { need, reason, page });
+      return {
+        content: [{ type: "text" as const, text }],
+      };
+    } catch (err) {
+      return {
+        content: [{ type: "text" as const, text: String(err) }],
         isError: true,
       };
     }

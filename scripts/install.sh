@@ -30,7 +30,7 @@ cp -R "$REPO_ROOT/templates/." "$APT_HOME/templates/"
 cp "$REPO_ROOT/bin/"* "$APT_HOME/bin/"
 cp "$REPO_ROOT/scripts/merge-mcp-config.js" "$REPO_ROOT/scripts/write-project-mcp-json.js" "$SCRIPTS_DIR/"
 cp "$REPO_ROOT/README.md" "$APT_HOME/"
-chmod +x "$APT_HOME/bin/agent-init.sh" "$APT_HOME/bin/start-init.sh"
+chmod +x "$APT_HOME/bin/"*.sh
 
 echo "Registering MCP globally (Claude Code + Cursor)..."
 CURSOR_MCP="$HOME/.cursor/mcp.json"
