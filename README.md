@@ -10,7 +10,7 @@
 
 ## 这是什么？
 
-APT（Agent-Protocol-Toolkit）是一套**全局安装、按项目激活**的开发工具集，面向 **Claude Code** 与 **MCP（Model Context Protocol）**。
+APT（Agent-Protocol-Toolkit）是一套**全局安装、按项目激活**的开发工具集，面向 **Claude Code**、**Cursor** 与 **MCP（Model Context Protocol）**。
 
 大模型在长任务里常见问题：
 
@@ -22,7 +22,7 @@ APT 用四层机制解决这些问题：
 
 | 层级 | 作用 |
 |------|------|
-| **Custom Commands** | `/feature`（推荐）、`/start-feature`、`/finish-feature`、`/design-system` 引导固定流程 |
+| **Custom Commands** | 6 个斜杠命令；有 brainstorming spec 时 **`/plan-from-spec` → `/implement-plan`**，否则 **`/feature`**（见下方工作流） |
 | **MCP Server** | 契约 / 架构 / 设计共 **13** 个工具，代理必须调用 |
 | **架构引擎** | `start-init` 扫描代码，生成可检索的架构文档 + 向量库 |
 | **项目数据** | `.ai/db.json`、`.ai/arch/`、`.ai/design/` 存契约、架构与设计知识 |
@@ -197,9 +197,12 @@ flowchart TB
 ## 环境要求
 
 - **Node.js 18+**
-- **Claude Code**（已安装 CLI，支持 MCP）
+- **Claude Code** 和/或 **Cursor**（均需支持 MCP）
+- Claude Code 用户需安装 **Claude CLI**（`claude mcp` 注册全局 MCP）
 - **架构扫描**需要 OpenAI 兼容的 Embedding / Chat API（见下方配置）
   - 已验证：阿里 DashScope、讯飞 MaaS 等兼容网关
+
+团队实践文档：[Claude Code 与 Cursor 最佳实践](docs/claude-code-best-practices.md)
 
 ---
 
@@ -232,7 +235,21 @@ chmod +x scripts/install.sh
 3. 合并 MCP 配置到 Cursor `mcp.json` 与 Claude Code `~/.claude.json`（**不是** `settings.json`）
 4. 将 `~/.apt/bin` 加入 PATH（含 `agent-init`、`start-init`、`design-sync`、`sync-changes`）
 
-安装完成后**重启终端**（Windows 建议重启 Claude Code）。
+安装完成后**重启终端**，并**新开** Claude Code / Cursor 会话以加载 MCP。
+
+### 升级 APT（仓库拉取新提交后）
+
+在 APT 仓库根目录重新安装，同步 `~/.apt/templates/` 与 MCP 入口；再在**各业务项目根**执行 `agent-init` 刷新斜杠命令：
+
+```powershell
+cd F:\software\claude_plugin   # 你的 APT 克隆路径
+git pull
+.\scripts\install.ps1
+cd E:\your-business-project
+agent-init
+```
+
+仅重注册 MCP、不重建引擎时，可单独执行 `.\scripts\merge-mcp-config.ps1`。
 
 ---
 
@@ -247,10 +264,12 @@ agent-init
 # 2. 配置 API Key（见下一节），然后扫描架构
 start-init
 
-# 3. 重启 Claude Code，加载 MCP
+# 3. 新开 Claude Code / Cursor 会话，/mcp 确认 13 个 APT 工具
 ```
 
 Windows 可用 `agent-init.cmd`、`start-init.cmd`。
+
+**Cursor：** 在业务项目根打开工作区；`agent-init` 会写入 `.cursor/mcp.json`（含 `APT_PROJECT_ROOT`）。若 MCP 列表出现两个 `agent-protocol-mcp`，只保留**项目级**那条（见 [故障排查](#cursor-里出现两个-agent-protocol-mcp)）。
 
 ### `agent-init` 做什么？
 
