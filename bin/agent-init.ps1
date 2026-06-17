@@ -17,7 +17,7 @@ if (-not (Test-Path $db)) {
 }
 
 $mcpEntry = Join-Path $aptHome "mcp-server\dist\index.js"
-$writeMcp = Join-Path $aptHome "scripts\write-project-mcp-json.js"
+$writeMcp = Join-Path $aptHome "scripts\write-project-mcp-json.cjs"
 if ((Test-Path $mcpEntry) -and (Test-Path $writeMcp)) {
   node $writeMcp $target $mcpEntry
 }

@@ -72,6 +72,10 @@ async function readOptional(filePath: string): Promise<string | null> {
   }
 }
 
+function stripBom(text: string): string {
+  return text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
+}
+
 async function componentFromPrompt(
   dsRoot: string,
   dsSourceRoot: string | null,
@@ -117,11 +121,16 @@ async function ingestDsFolder(
   style: string;
 }> {
   const manifestPath = path.join(dsFolderAbs, "_ds_manifest.json");
+  const manifestRaw = await readOptional(manifestPath);
   let manifest: BaoyuDsManifest = {};
-  try {
-    manifest = JSON.parse(await fs.readFile(manifestPath, "utf-8")) as BaoyuDsManifest;
-  } catch {
-    warnings.push(`Missing or invalid _ds_manifest.json in ${dsFolderAbs}`);
+  if (!manifestRaw) {
+    warnings.push(`Missing _ds_manifest.json in ${dsFolderAbs}`);
+  } else {
+    try {
+      manifest = JSON.parse(stripBom(manifestRaw)) as BaoyuDsManifest;
+    } catch {
+      warnings.push(`Invalid _ds_manifest.json in ${dsFolderAbs}`);
+    }
   }
 
   const stylesPath = path.join(dsFolderAbs, "styles.css");
@@ -198,7 +207,11 @@ export async function ingestBaoyuSource(
   let meta: BaoyuMeta | null = null;
   const metaText = await readOptional(metaPath);
   if (metaText) {
-    meta = JSON.parse(metaText) as BaoyuMeta;
+    try {
+      meta = JSON.parse(stripBom(metaText)) as BaoyuMeta;
+    } catch {
+      warnings.push(`Invalid _d_meta.json in ${sourceAbs}`);
+    }
   }
 
   let allTokens: Record<string, Record<string, string>> = {};
@@ -306,5 +319,10 @@ export async function collectRefFiles(
 
 export async function readBaoyuMeta(sourceAbs: string): Promise<BaoyuMeta | null> {
   const text = await readOptional(path.join(sourceAbs, "_d_meta.json"));
-  return text ? (JSON.parse(text) as BaoyuMeta) : null;
+  if (!text) return null;
+  try {
+    return JSON.parse(stripBom(text)) as BaoyuMeta;
+  } catch {
+    return null;
+  }
 }

@@ -10,7 +10,7 @@ import {
   getDesignStylePath,
   getDesignTokensDir,
 } from "./paths.js";
-import type { DesignComponentCard, DesignGapRequest, DesignProfile } from "./types.js";
+import type { DesignComponentCard, DesignGapRequest, DesignPageRecipe, DesignProfile } from "./types.js";
 import { assertDesignId } from "./ids.js";
 import { MissingDesignProfileError, DesignComponentNotFoundError, DesignPageNotFoundError } from "./errors.js";
 import type {
@@ -90,7 +90,7 @@ export async function queryDesign(
 
   if (options.page) {
     assertDesignId(options.page, "page");
-    const page = await readJsonFile(
+    const page = await readJsonFile<DesignPageRecipe>(
       path.join(getDesignPagesDir(projectRoot), `${options.page}.json`)
     );
     if (!page) throw new DesignPageNotFoundError(options.page);

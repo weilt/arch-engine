@@ -16,7 +16,7 @@ $cursorDir = Split-Path $cursorMcp -Parent
 if ($cursorDir) {
   New-Item -ItemType Directory -Force -Path $cursorDir | Out-Null
 }
-node (Join-Path $ScriptDir "merge-mcp-config.js") $cursorMcp $McpEntry "mcpServers" "-"
+node (Join-Path $ScriptDir "merge-mcp-config.cjs") $cursorMcp $McpEntry "mcpServers" "-"
 Write-Host "OK Cursor -> $cursorMcp"
 
 # Claude Code: ~/.claude.json user scope (NOT ~/.claude/settings.json — silently ignored)

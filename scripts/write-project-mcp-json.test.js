@@ -5,7 +5,7 @@ const os = require("node:os");
 const path = require("node:path");
 const { execFileSync } = require("node:child_process");
 
-const script = path.join(__dirname, "write-project-mcp-json.js");
+const script = path.join(__dirname, "write-project-mcp-json.cjs");
 
 describe("write-project-mcp-json", () => {
   let tmpDir;

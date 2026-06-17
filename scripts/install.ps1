@@ -67,8 +67,8 @@ try {
 
 Copy-Item -Path (Join-Path $RepoRoot "templates\*") -Destination (Join-Path $AptHome "templates") -Force
 Copy-Item -Path (Join-Path $RepoRoot "bin\*") -Destination (Join-Path $AptHome "bin") -Force
-Copy-Item -Path (Join-Path $RepoRoot "scripts\merge-mcp-config.js") -Destination $scriptsTarget -Force
-Copy-Item -Path (Join-Path $RepoRoot "scripts\write-project-mcp-json.js") -Destination $scriptsTarget -Force
+Copy-Item -Path (Join-Path $RepoRoot "scripts\merge-mcp-config.cjs") -Destination $scriptsTarget -Force
+Copy-Item -Path (Join-Path $RepoRoot "scripts\write-project-mcp-json.cjs") -Destination $scriptsTarget -Force
 Copy-Item -Path (Join-Path $RepoRoot "README.md") -Destination $AptHome -Force
 
 Write-Host "Registering MCP globally (Claude Code + Cursor)..."

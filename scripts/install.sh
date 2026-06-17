@@ -28,7 +28,7 @@ cp "$REPO_ROOT/mcp-server/package-lock.json" "$APT_HOME/mcp-server/"
 (cd "$APT_HOME/mcp-server" && npm ci --omit=dev)
 cp -R "$REPO_ROOT/templates/." "$APT_HOME/templates/"
 cp "$REPO_ROOT/bin/"* "$APT_HOME/bin/"
-cp "$REPO_ROOT/scripts/merge-mcp-config.js" "$REPO_ROOT/scripts/write-project-mcp-json.js" "$SCRIPTS_DIR/"
+cp "$REPO_ROOT/scripts/merge-mcp-config.cjs" "$REPO_ROOT/scripts/write-project-mcp-json.cjs" "$SCRIPTS_DIR/"
 cp "$REPO_ROOT/README.md" "$APT_HOME/"
 chmod +x "$APT_HOME/bin/"*.sh
 

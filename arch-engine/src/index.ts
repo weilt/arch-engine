@@ -133,9 +133,12 @@ export {
 
 export {
   runDesignSync,
-  type DesignSyncOptions,
-  type DesignSyncReport,
 } from "./design/sync.js";
+
+export type {
+  DesignSyncOptions,
+  DesignSyncReport,
+} from "./design/types.js";
 
 export type {
   DesignProfile,

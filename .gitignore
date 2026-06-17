@@ -11,3 +11,7 @@ dist/
 
 # 测试临时目录
 *.tmp
+
+# agent-init 写入的项目 MCP（含本机 APT 绝对路径）
+.mcp.json
+.cursor/mcp.json

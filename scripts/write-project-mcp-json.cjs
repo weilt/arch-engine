@@ -5,7 +5,7 @@ const projectRoot = process.argv[2];
 const entry = process.argv[3];
 
 if (!projectRoot || !entry) {
-  console.error("Usage: node write-project-mcp-json.js <projectRoot> <mcpEntry>");
+  console.error("Usage: node write-project-mcp-json.cjs <projectRoot> <mcpEntry>");
   process.exit(1);
 }
 
@@ -40,14 +40,12 @@ function writeMcpFile(filePath, entryConfig) {
   console.log("OK " + filePath);
 }
 
-// Claude Code project MCP (.mcp.json)
 writeMcpFile(path.join(projectRootAbs, ".mcp.json"), {
   type: "stdio",
   command: "node",
   args: [entry],
 });
 
-// Cursor project MCP (.cursor/mcp.json)
 writeMcpFile(path.join(projectRootAbs, ".cursor", "mcp.json"), {
   command: "node",
   args: [entry],
