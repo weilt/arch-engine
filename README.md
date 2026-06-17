@@ -22,7 +22,7 @@ APT 用四层机制解决这些问题：
 
 | 层级 | 作用 |
 |------|------|
-| **Custom Commands** | `/start-feature`、`/finish-feature` 引导固定流程 |
+| **Custom Commands** | `/feature`（推荐）、`/start-feature`、`/finish-feature` 引导固定流程 |
 | **MCP Server** | `query_contract` / `register_contract` 等工具，代理必须调用 |
 | **架构引擎** | `start-init` 扫描代码，生成可检索的架构文档 + 向量库 |
 | **项目数据** | `.ai/db.json`、`.ai/arch/` 存契约与架构，随项目走 |
@@ -43,8 +43,34 @@ APT 用四层机制解决这些问题：
 - **`search_arch`**：自然语言语义搜索（「用户登录接口在哪？」），结果含 `assetId`、`sourcePath` 便于跳转源码
 - **`query_arch`**：按 path 精读（如 `backend/base-module-system-server/api#POST-/admin-api/system/auth/login`）
 - **`register_asset`**：开发完成后登记可复用架构资产（工具类、枚举、组件等），立刻写入 `.ai/arch/` 并 upsert 向量库
+- **`audit_arch_changes`**：对比上次 `start-init` 锚点，报告 `modified` / `unregistered` / `deleted` 资产（支持 git 与 nogit `fileHashes`）
+- **`refresh_asset`**：从源码 AI summarize 后重索引单个资产（改代码后必须用此工具，不能用旧 summary 调 `register_asset` 代替）
+- **`remove_asset`**：从 Markdown、arch-index 与向量库删除失效资产
+- **`sync_arch_changes`**：批量 audit → refresh → remove（等同 `sync-changes` CLI）
 
-### 跨平台
+### 开发后同步架构
+
+功能开发完成后，架构向量与 Markdown 必须与源码一致。推荐流程：
+
+| 方式 | 何时用 |
+|------|--------|
+| **`/feature`**（推荐） | 寻址 → 计划 → 实现 → **自动闭环**（含 audit/refresh/remove） |
+| **`/start-feature`** | 同上，实现完成后也会自动闭环，无需再调 `/finish-feature` |
+| **`/finish-feature`** | **补救**：漏跑闭环时手动执行 |
+| **`sync-changes`** | CLI 批量同步；`--dry-run` 仅报告，不写库 |
+| **`start-init --incremental`** | 模块级全量重扫（变更面大时） |
+| **`start-init --full`** | 清空 `.ai/arch` 后完整重建 |
+
+**nogit 项目**（无 git 或不用 commit 锚点）：`start-init` 会写入 `last-scan.json` 的 `fileHashes`；`audit_arch_changes` 用文件 hash 检测变更。
+
+```powershell
+# 预览变更（不写库）
+sync-changes --dry-run
+
+# 在项目根批量修复
+sync-changes
+```
+
 
 - macOS / Linux：`install.sh`、`agent-init.sh`
 - Windows：`install.ps1`、`agent-init.ps1` / `.cmd`
@@ -150,6 +176,7 @@ Windows 可用 `agent-init.cmd`、`start-init.cmd`。
 
 - 复制 `/start-feature`、`/finish-feature` 到 `.claude/commands/`
 - 创建 `.ai/db.json`（空契约库）
+- 写入 `.mcp.json` 与 `.cursor/mcp.json`，设置 `APT_PROJECT_ROOT` 指向当前项目
 
 ### `start-init` 做什么？
 
@@ -430,10 +457,10 @@ claude mcp list   # 应显示 ✓ Connected
 | 步骤 | 作用 |
 |------|------|
 | **`install.ps1`** | 全局注册 MCP（Claude Code `user` 作用域 + Cursor `mcp.json`），**所有项目**可用 |
-| **`agent-init`**（每个项目根） | 注入斜杠命令、初始化 `.ai/db.json`、写入项目根 `.mcp.json`（团队可入库） |
+| **`agent-init`**（每个项目根） | 注入斜杠命令、初始化 `.ai/db.json`、写入项目根 `.mcp.json` 与 `.cursor/mcp.json`（含 `APT_PROJECT_ROOT`） |
 | **`start-init`**（每个项目根） | 扫描架构生成 `.ai/arch/`（与 MCP 注册无关） |
 
-在业务项目里开发时，用该项目文件夹作为工作区打开即可；MCP 通过 `process.cwd()` 读当前项目的 `.ai/`。若必须在工具仓目录里操作业务数据，可手动设 `APT_PROJECT_ROOT` 环境变量（高级用法）。
+在业务项目里开发时，用该项目文件夹作为工作区打开即可。`agent-init` 会在项目级 `.mcp.json` / `.cursor/mcp.json` 中写入 `APT_PROJECT_ROOT`，MCP 始终读取该项目的 `.ai/`。若使用全局 MCP 且未跑过 `agent-init`，可手动设 `APT_PROJECT_ROOT`（高级用法）。
 
 ### `Missing API key for embedding`？
 

@@ -1,5 +1,5 @@
 ---
-description: 开发新功能前的依赖寻址与计划；必须先经 MCP 查契约/架构，确认后再写代码
+description: 单命令全流程：寻址 → 计划 → 实现 → 自动闭环（推荐）
 model: sonnet
 ---
 
@@ -26,12 +26,6 @@ model: sonnet
 
 4. **仅当以上步骤均无法得到可用定义时**，才调用 **`report_missing`** 上报该依赖，并**停止**当前功能开发。
 
-说明（给你自己，不要复述给用户）：
-
-- Java 基类、Mapper、DO、Service、工具类、错误码等，通常走 **search_arch + query_arch** 即可，**不要求**必须有 TS 契约。
-- 前端/跨端 TS 类型优先走 **query_contract**。
-- 两种来源都合法；计划中简要标注来源即可，无需让用户决策。
-
 ## 2. 开发计划
 
 汇总：功能范围、每个依赖的寻址结果（契约 / 架构文档 + `sourcePath`）、拟改动的模块与文件、风险点。
@@ -43,7 +37,7 @@ model: sonnet
 用户确认后进入实现。当实现完成且可以交付时：
 
 1. **不要**等待用户输入 `/finish-feature`。
-2. **立即**执行与 `finish-feature` 相同的闭环（见下方 closeout 步骤）。
+2. **立即**执行下列闭环（禁止跳过）。
 3. 最终报告单独列出 **「闭环摘要」**。
 
 <!-- keep in sync with templates/_feature-closeout.md -->

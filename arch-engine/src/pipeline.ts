@@ -14,6 +14,7 @@ import {
   mapFilesToModules,
   mapFilesToPackages,
 } from "./incremental/git-diff.js";
+import { collectTrackedSourceHashes } from "./incremental/file-hashes.js";
 import { readLastScan, writeLastScan } from "./incremental/last-scan.js";
 import { getArchDir, getVectorsDbPath } from "./paths.js";
 import {
@@ -206,6 +207,7 @@ function buildLastScanState(
   packageDirs: Map<string, string>,
   moduleAssetCounts: Map<string, number>,
   packageAssetCounts: Map<string, number>,
+  fileHashMap: Record<string, Record<string, string>>,
   commit: string,
   branch: string
 ): LastScanState {
@@ -214,7 +216,7 @@ function buildLastScanState(
     modulesState[mod.slug] = {
       sourcePath: mod.path,
       assetCount: moduleAssetCounts.get(mod.slug) ?? modulesState[mod.slug]?.assetCount ?? 0,
-      fileHashes: modulesState[mod.slug]?.fileHashes ?? {},
+      fileHashes: fileHashMap[mod.slug] ?? {},
     };
   }
 
@@ -226,7 +228,7 @@ function buildLastScanState(
         ? path.relative(projectRoot, dir).replace(/\\/g, "/")
         : (packagesState[pkg.slug]?.sourcePath ?? pkg.slug),
       assetCount: packageAssetCounts.get(pkg.slug) ?? packagesState[pkg.slug]?.assetCount ?? 0,
-      fileHashes: packagesState[pkg.slug]?.fileHashes ?? {},
+      fileHashes: fileHashMap[pkg.slug] ?? {},
     };
   }
 
@@ -545,6 +547,12 @@ export async function runStartInit(
     await writeIndexMd(projectRoot, updatedIndex);
   }
 
+  const fileHashMap = await collectTrackedSourceHashes(
+    projectRoot,
+    model.modules,
+    model.packages,
+    packageDirs
+  );
   const commit = getCurrentCommit(projectRoot);
   const branch = getCurrentBranch(projectRoot);
   await writeLastScan(
@@ -557,6 +565,7 @@ export async function runStartInit(
       packageDirs,
       moduleAssetCounts,
       packageAssetCounts,
+      fileHashMap,
       commit,
       branch
     )

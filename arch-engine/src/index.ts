@@ -51,6 +51,7 @@ export {
   writeModuleAssetDocs,
   upsertAssetCardInModuleDoc,
   upsertAssetSectionInMarkdown,
+  removeAssetSectionFromMarkdown,
 } from "./writer/asset-md.js";
 
 export {
@@ -81,3 +82,32 @@ export {
   type PipelineOptions,
   type StartInitReport,
 } from "./pipeline.js";
+
+export {
+  auditArchChanges,
+  MissingLastScanError,
+  type AuditArchChangesResult,
+  type AuditArchChangesOptions,
+  type AuditItem,
+} from "./audit/changes.js";
+
+export {
+  refreshAssetInArch,
+  type RefreshAssetInput,
+  type RefreshAssetResult,
+  type RefreshAssetDeps,
+} from "./refresh/asset.js";
+
+export {
+  removeAssetFromArch,
+  type RemoveAssetInput,
+  type RemoveAssetResult,
+} from "./remove/asset.js";
+
+export {
+  runSyncChanges,
+  type SyncChangesOptions,
+  type SyncChangesReport,
+} from "./sync/run.js";
+
+export { readLastScan, writeLastScan } from "./incremental/last-scan.js";

@@ -40,6 +40,6 @@ if ($claudeCli) {
 Write-Host ""
 Write-Host "agent-protocol-mcp -> $McpEntry"
 Write-Host "MCP reads each project's .ai/ via process.cwd() when you run Claude/Cursor in that project."
-Write-Host "Per-project: run agent-init in project root (writes .mcp.json + .ai/db.json)."
+Write-Host "Per-project: run agent-init in project root (writes .mcp.json, .cursor/mcp.json + APT_PROJECT_ROOT)."
 Write-Host "Note: ~/.claude/settings.json mcpServers is IGNORED by Claude Code."
 Write-Host "Restart Cursor / start a new Claude Code session to reload MCP."

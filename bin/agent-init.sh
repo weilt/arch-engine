@@ -6,7 +6,13 @@ TARGET="${1:-$(pwd)}"
 TARGET="$(cd "$TARGET" && pwd)"
 
 mkdir -p "$TARGET/.claude/commands"
-cp "$APT_HOME/templates/"*.md "$TARGET/.claude/commands/"
+for f in "$APT_HOME/templates/"*.md; do
+  base="$(basename "$f")"
+  case "$base" in
+    _*) continue ;;
+    *) cp "$f" "$TARGET/.claude/commands/" ;;
+  esac
+done
 
 mkdir -p "$TARGET/.ai"
 DB="$TARGET/.ai/db.json"

@@ -1,12 +1,3 @@
----
-description: 功能完成后的补救闭环（start-feature / feature 应已自动执行；仅当漏跑时使用）
-model: sonnet
----
-
-你现在已经完成了核心代码。若 `/start-feature` 或 `/feature` 尚未执行自动闭环，**必须**补跑下列步骤。
-
-<!-- keep in sync with templates/_feature-closeout.md -->
-
 你已完成核心实现，**必须**执行下列闭环（禁止跳过）。
 
 ## 0. 架构变更同步（必须）

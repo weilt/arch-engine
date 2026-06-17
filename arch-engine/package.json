@@ -5,7 +5,8 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
-    "start-init": "dist/cli.js"
+    "start-init": "dist/cli.js",
+    "sync-changes": "dist/cli-sync.js"
   },
   "exports": {
     ".": "./dist/index.js"

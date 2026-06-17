@@ -9,20 +9,46 @@ if (!projectRoot || !entry) {
   process.exit(1);
 }
 
-const mcpPath = path.join(projectRoot, ".mcp.json");
-let doc = {};
-if (fs.existsSync(mcpPath)) {
-  doc = JSON.parse(fs.readFileSync(mcpPath, "utf8"));
+const projectRootAbs = path.resolve(projectRoot);
+
+function mergeAgentProtocolEntry(doc, entryConfig) {
+  doc.mcpServers = doc.mcpServers || {};
+  const prev = doc.mcpServers["agent-protocol-mcp"] || {};
+  doc.mcpServers["agent-protocol-mcp"] = {
+    ...entryConfig,
+    env: {
+      ...(prev.env || {}),
+      ...(entryConfig.env || {}),
+      APT_PROJECT_ROOT: projectRootAbs,
+    },
+  };
+  return doc;
 }
 
-doc.mcpServers = doc.mcpServers || {};
-const prev = doc.mcpServers["agent-protocol-mcp"] || {};
-doc.mcpServers["agent-protocol-mcp"] = {
+function readJsonOrEmpty(filePath) {
+  if (!fs.existsSync(filePath)) {
+    return {};
+  }
+  return JSON.parse(fs.readFileSync(filePath, "utf8"));
+}
+
+function writeMcpFile(filePath, entryConfig) {
+  const dir = path.dirname(filePath);
+  fs.mkdirSync(dir, { recursive: true });
+  const doc = mergeAgentProtocolEntry(readJsonOrEmpty(filePath), entryConfig);
+  fs.writeFileSync(filePath, JSON.stringify(doc, null, 2) + "\n");
+  console.log("OK " + filePath);
+}
+
+// Claude Code project MCP (.mcp.json)
+writeMcpFile(path.join(projectRootAbs, ".mcp.json"), {
   type: "stdio",
   command: "node",
   args: [entry],
-  ...(prev.env ? { env: prev.env } : {}),
-};
+});
 
-fs.writeFileSync(mcpPath, JSON.stringify(doc, null, 2) + "\n");
-console.log("OK " + mcpPath);
+// Cursor project MCP (.cursor/mcp.json)
+writeMcpFile(path.join(projectRootAbs, ".cursor", "mcp.json"), {
+  command: "node",
+  args: [entry],
+});

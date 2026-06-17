@@ -81,7 +81,7 @@ export interface AssetCard {
   exports: string[];
   related: string[];
   tags: string[];
-  source: "scan" | "register";
+  source: "scan" | "register" | "refresh";
   updatedAt: string;
 }
 

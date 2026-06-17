@@ -326,6 +326,30 @@ export class VectorStore {
     }
   }
 
+  listSourcePaths(): string[] {
+    const rows = this.db
+      .prepare(
+        `SELECT DISTINCT source_path FROM chunks WHERE source_path IS NOT NULL AND source_path != ''`
+      )
+      .all() as { source_path: string }[];
+    return rows.map((r) => r.source_path);
+  }
+
+  assetIdsBySourcePath(sourcePath: string): string[] {
+    const rows = this.db
+      .prepare(`SELECT id FROM chunks WHERE source_path = ?`)
+      .all(sourcePath) as { id: string }[];
+    return rows.map((r) => r.id).filter((id) => isAssetChunkId(id));
+  }
+
+  getSourcePathForAssetId(assetId: string): string | undefined {
+    const row = this.db
+      .prepare(`SELECT source_path FROM chunks WHERE id = ?`)
+      .get(assetId) as { source_path: string | null } | undefined;
+    const sp = row?.source_path;
+    return sp && sp.length > 0 ? sp : undefined;
+  }
+
   search(queryEmbedding: number[], limit: number, kind?: string): SearchHit[] {
     if (limit <= 0) return [];
 

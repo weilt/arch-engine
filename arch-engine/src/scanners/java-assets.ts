@@ -37,7 +37,7 @@ function extractPublicSignatures(content: string): string[] {
   return sigs;
 }
 
-function classifyJavaFile(
+export function classifyJavaFile(
   content: string,
   filePath: string
 ): { kind: AssetKind; name: string; tags?: string[] } | null {

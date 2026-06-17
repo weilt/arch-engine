@@ -8,6 +8,10 @@ import { getProjectRoot, resolveTsPath } from "./paths.js";
 import { regenerateIndexMd } from "./index-md.js";
 import { handleQueryArch, handleSearchArch } from "./arch-query.js";
 import { handleRegisterAsset, REGISTER_ASSET_KINDS } from "./register-asset.js";
+import { handleAuditArchChanges } from "./audit-changes.js";
+import { handleRefreshAsset, REFRESH_ASSET_KINDS } from "./refresh-asset.js";
+import { handleRemoveAsset } from "./remove-asset.js";
+import { handleSyncArchChanges } from "./sync-changes.js";
 
 const projectRoot = getProjectRoot();
 
@@ -175,6 +179,127 @@ server.tool(
     } catch (err) {
       return {
         content: [{ type: "text" as const, text: String(err) }],
+        isError: true,
+      };
+    }
+  }
+);
+
+server.tool(
+  "audit_arch_changes",
+  "Report architecture asset changes since last scan (modified, new, deleted, unregistered)",
+  {
+    since: z
+      .string()
+      .optional()
+      .describe('Anchor commit or "last-scan" (default uses last-scan.json commit)'),
+    paths: z
+      .array(z.string())
+      .optional()
+      .describe("Limit audit to these relative source paths"),
+  },
+  async ({ since, paths }) => {
+    try {
+      const result = await handleAuditArchChanges(projectRoot, {
+        since: since ?? "last-scan",
+        paths,
+      });
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+      };
+    } catch (err) {
+      return {
+        content: [{ type: "text" as const, text: `❌ ${String(err)}` }],
+        isError: true,
+      };
+    }
+  }
+);
+
+server.tool(
+  "refresh_asset",
+  "Re-index a single architecture asset from source via AI summarize (use after code changes)",
+  {
+    sourcePath: z.string().describe("Source file path relative to project root"),
+    kind: z.enum(REFRESH_ASSET_KINDS).optional(),
+    name: z.string().optional(),
+    module: z.string().optional().describe('Module slug, e.g. "base-common"'),
+  },
+  async (input) => {
+    try {
+      const result = await handleRefreshAsset(projectRoot, input);
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+      };
+    } catch (err) {
+      return {
+        content: [{ type: "text" as const, text: `❌ ${String(err)}` }],
+        isError: true,
+      };
+    }
+  }
+);
+
+server.tool(
+  "remove_asset",
+  "Remove an architecture asset from markdown, index, and vector store",
+  {
+    assetId: z.string().optional().describe("Stable asset id, e.g. backend/demo/util/JsonUtils"),
+    sourcePath: z
+      .string()
+      .optional()
+      .describe("Source file path (used when assetId omitted)"),
+  },
+  async (input) => {
+    try {
+      if (!input.assetId && !input.sourcePath) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: "❌ Either assetId or sourcePath is required",
+            },
+          ],
+          isError: true,
+        };
+      }
+      const result = await handleRemoveAsset(projectRoot, input);
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+      };
+    } catch (err) {
+      return {
+        content: [{ type: "text" as const, text: `❌ ${String(err)}` }],
+        isError: true,
+      };
+    }
+  }
+);
+
+server.tool(
+  "sync_arch_changes",
+  "Audit architecture changes and optionally batch refresh/remove (same as sync-changes CLI)",
+  {
+    dryRun: z
+      .boolean()
+      .optional()
+      .describe("If true, only report audit results without writes"),
+    since: z.string().optional().describe('Anchor: "last-scan" or git commit'),
+    paths: z.array(z.string()).optional().describe("Limit to these source paths"),
+  },
+  async ({ dryRun, since, paths }) => {
+    try {
+      const result = await handleSyncArchChanges(projectRoot, {
+        dryRun: dryRun ?? false,
+        since,
+        paths,
+      });
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+      };
+    } catch (err) {
+      return {
+        content: [{ type: "text" as const, text: `❌ ${String(err)}` }],
         isError: true,
       };
     }

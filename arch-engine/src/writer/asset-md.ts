@@ -55,7 +55,7 @@ export function renderAssetCard(card: AssetCard): string {
   return `## ${card.name}\n\n${table}\n`;
 }
 
-function renderKindFile(kind: AssetKind, cards: AssetCard[]): string {
+export function renderKindFile(kind: AssetKind, cards: AssetCard[]): string {
   const title =
     kind === "enum"
       ? "Enums"
@@ -157,6 +157,36 @@ export function upsertAssetSectionInMarkdown(existingMd: string, card: AssetCard
 
   const trimmed = existingMd.trimEnd();
   return trimmed.length > 0 ? `${trimmed}\n\n${section}\n` : `${section}\n`;
+}
+
+export function removeAssetSectionFromMarkdown(
+  existingMd: string,
+  assetName: string,
+  kind: AssetKind = "util"
+): string {
+  const header = `## ${assetName}`;
+  const lines = existingMd.split("\n");
+  let start = -1;
+  let end = lines.length;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]!;
+    if (line === header) {
+      start = i;
+      continue;
+    }
+    if (start !== -1 && (/^## /.test(line) || /^# /.test(line))) {
+      end = i;
+      break;
+    }
+  }
+
+  if (start === -1) return existingMd;
+
+  const before = lines.slice(0, start).join("\n").trimEnd();
+  const after = lines.slice(end).join("\n").trimStart();
+  const joined = [before, after].filter((p) => p.length > 0).join("\n\n");
+  return joined.length > 0 ? `${joined}\n` : renderKindFile(kind, []);
 }
 
 export async function upsertAssetCardInModuleDoc(

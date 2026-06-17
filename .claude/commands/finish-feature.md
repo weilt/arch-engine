@@ -1,44 +1,32 @@
-你现在已经完成了核心代码，必须执行闭环注册！
+---
+description: 功能完成后的补救闭环（start-feature / feature 应已自动执行；仅当漏跑时使用）
+model: sonnet
+---
 
-## 闭环注册（必须）
+你现在已经完成了核心代码。若 `/start-feature` 或 `/feature` 尚未执行自动闭环，**必须**补跑下列步骤。
 
-### 1. TS 契约（若有对外 TS 类型）
+<!-- keep in sync with templates/_feature-closeout.md -->
 
-1. 检查你是否新建了可供外部调用的接口、类或函数。
-2. 确保新接口在 `src/contracts/` 或对应目录下有严格的 TypeScript 类型定义文件。
-3. 对于每一个新的 TS 契约，**必须调用 MCP 工具 `register_contract`**，传入 `name`、`description`、`tsFilePath`。
+你已完成核心实现，**必须**执行下列闭环（禁止跳过）。
 
-### 2. 架构资产（若有新建/显著修改的可复用能力）
+## 0. 架构变更同步（必须）
 
-以下任一项必须调用 **`register_asset`**（与 `register_contract` 双轨并行，互不替代）：
+1. 调用 **`audit_arch_changes`**（默认 `since: last-scan`）。无 `last-scan.json` 时报告需先 `start-init`。
+2. 对 **`modified`** 每一项：调用 **`refresh_asset`**（`sourcePath` 必填）。禁止仅用旧 summary 调 `register_asset` 代替。
+3. 对 **`new`** / **`unregistered`**：调用 **`refresh_asset`**（从源码入库）。
+4. 对 **`deleted`**：调用 **`remove_asset`**（`assetId` 或 `sourcePath`）。
+5. 若四类皆空：在报告中写明「无架构资产变更」。
 
-- 新组件、工具类、枚举
-- 新 Feign / CommonApi、对外 REST 接口
-- 新 starter 模块或 UI 基础包导出
-- 新 POJO / DTO 作为跨模块共享模型
+可选补救：在项目根执行 `sync-changes` 或 `sync-changes --dry-run` 预览。
 
-示例调用：
+## 1. TS 契约（若有对外 TS 类型）
 
-```json
-{
-  "kind": "util",
-  "name": "JsonUtils",
-  "module": "base-common",
-  "sourcePath": "base-common/src/main/java/.../JsonUtils.java",
-  "summary": "JSON 序列化与反序列化工具",
-  "whenToUse": "需要在模块间统一 JSON 处理时",
-  "howToUse": "直接调用静态方法 parse / stringify",
-  "exports": ["parse", "stringify"],
-  "tags": ["json", "util"]
-}
-```
+1. 检查是否新建可供外部调用的接口、类或函数。
+2. 确保 `src/contracts/` 或对应目录有严格 TS 类型定义。
+3. 每个新契约调用 **`register_contract`**（`name`, `description`, `tsFilePath`）。
 
-`kind` 可选：`component` | `util` | `enum` | `starter` | `api` | `rpc` | `pojo`。
+## 2. 验证
 
-### 3. 验证
-
-- 对每个 `register_contract`：确认 `.ai/INDEX.md` 已更新。
-- 对每个 `register_asset`：用自然语言调用 `search_arch`，确认 top 结果含刚注册的 `assetId` 与 `sourcePath`。
-- 需要精读文档时，用 `query_arch` 访问返回的 `path`（可加 `#锚点`）。
-
-注册成功后，输出结构化完成报告（列出已注册的契约与架构资产）。
+- 每个 `register_contract`：确认 `.ai/INDEX.md` 已更新。
+- 每个 refresh/remove：用 **`search_arch`** 抽检；精读用 **`query_arch`**。
+- 输出 **闭环摘要**：audit 统计、已 refresh 的 assetId 列表、已注册契约列表。
