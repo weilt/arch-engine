@@ -69,9 +69,11 @@ Copy-Item -Path (Join-Path $RepoRoot "templates\*") -Destination (Join-Path $Apt
 Copy-Item -Path (Join-Path $RepoRoot "bin\*") -Destination (Join-Path $AptHome "bin") -Force
 Copy-Item -Path (Join-Path $RepoRoot "scripts\merge-mcp-config.cjs") -Destination $scriptsTarget -Force
 Copy-Item -Path (Join-Path $RepoRoot "scripts\write-project-mcp-json.cjs") -Destination $scriptsTarget -Force
+Copy-Item -Path (Join-Path $RepoRoot "scripts\inject-platform-assets.cjs") -Destination $scriptsTarget -Force
+Copy-Item -Path (Join-Path $RepoRoot "scripts\write-codex-config.cjs") -Destination $scriptsTarget -Force
 Copy-Item -Path (Join-Path $RepoRoot "README.md") -Destination $AptHome -Force
 
-Write-Host "Registering MCP globally (Claude Code + Cursor)..."
+Write-Host "Registering MCP globally (Claude Code, Cursor, Qoder, Codex)..."
 & (Join-Path (Split-Path -Parent $MyInvocation.MyCommand.Path) "merge-mcp-config.ps1")
 
 $binPath = Join-Path $AptHome "bin"

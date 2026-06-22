@@ -16,8 +16,10 @@
 2. 确保 `src/contracts/` 或对应目录有严格 TS 类型定义。
 3. 每个新契约调用 **`register_contract`**（`name`, `description`, `tsFilePath`）。
 
-## 2. 验证
+## 2. 闭环后自检（简要）
+
+完整验收请运行 **`/verify`**。此处仅做闭环后最小确认：
 
 - 每个 `register_contract`：确认 `.ai/INDEX.md` 已更新。
-- 每个 refresh/remove：用 **`search_arch`** 抽检；精读用 **`query_arch`**。
+- 每个 refresh/remove：用 **`search_arch`** 抽检 1–2 项；精读用 **`query_arch`**。
 - 输出 **闭环摘要**：audit 统计、已 refresh 的 assetId 列表、已注册契约列表。

@@ -37,9 +37,49 @@ if ($claudeCli) {
   Write-Warning "  claude mcp add agent-protocol-mcp -s user -- node $McpEntry"
 }
 
+# Qoder CLI: user scope
+$qoderCli = Get-Command qoder -ErrorAction SilentlyContinue
+if ($qoderCli) {
+  & qoder mcp remove agent-protocol-mcp -s user 2>&1 | Out-Null
+  $qoderRemoveExit = $LASTEXITCODE
+  if ($qoderRemoveExit -ne 0 -and $qoderRemoveExit -ne 1) {
+    Write-Warning "qoder mcp remove returned $qoderRemoveExit (ignored if server was not registered)"
+  }
+  & qoder mcp add agent-protocol-mcp -s user -- node $McpEntry
+  if ($LASTEXITCODE -ne 0) {
+    Write-Warning "qoder mcp add failed (exit $LASTEXITCODE). Run manually:"
+    Write-Warning "  qoder mcp add agent-protocol-mcp -s user -- node $McpEntry"
+  } else {
+    Write-Host "OK Qoder CLI (user scope, all projects)"
+  }
+} else {
+  Write-Warning "qoder CLI not found. After install, run:"
+  Write-Warning "  qoder mcp add agent-protocol-mcp -s user -- node $McpEntry"
+}
+
+# Codex CLI: global config
+$codexCli = Get-Command codex -ErrorAction SilentlyContinue
+if ($codexCli) {
+  & codex mcp remove agent-protocol-mcp 2>&1 | Out-Null
+  $codexRemoveExit = $LASTEXITCODE
+  if ($codexRemoveExit -ne 0 -and $codexRemoveExit -ne 1) {
+    Write-Warning "codex mcp remove returned $codexRemoveExit (ignored if server was not registered)"
+  }
+  & codex mcp add agent-protocol-mcp -- node $McpEntry
+  if ($LASTEXITCODE -ne 0) {
+    Write-Warning "codex mcp add failed (exit $LASTEXITCODE). Run manually:"
+    Write-Warning "  codex mcp add agent-protocol-mcp -- node $McpEntry"
+  } else {
+    Write-Host "OK Codex CLI (global)"
+  }
+} else {
+  Write-Warning "codex CLI not found. After install, run:"
+  Write-Warning "  codex mcp add agent-protocol-mcp -- node $McpEntry"
+}
+
 Write-Host ""
 Write-Host "agent-protocol-mcp -> $McpEntry"
-Write-Host "MCP reads each project's .ai/ via process.cwd() when you run Claude/Cursor in that project."
-Write-Host "Per-project: run agent-init in project root (writes .mcp.json, .cursor/mcp.json + APT_PROJECT_ROOT)."
+Write-Host "MCP reads each project's .ai/ via APT_PROJECT_ROOT when set in project config."
+Write-Host "Per-project: run agent-init in project root (.mcp.json, .cursor/mcp.json, .codex/config.toml)."
 Write-Host "Note: ~/.claude/settings.json mcpServers is IGNORED by Claude Code."
-Write-Host "Restart Cursor / start a new Claude Code session to reload MCP."
+Write-Host "Restart IDE / start a new agent session to reload MCP."

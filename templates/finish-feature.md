@@ -1,13 +1,11 @@
 ---
-description: 功能完成后的补救闭环（start-feature / feature 应已自动执行；仅当漏跑时使用）
+description: 闭环写侧补救（/verify 未通过或 feature/implement-plan 漏跑闭环时使用）
 model: sonnet
 ---
 
-你现在已经完成了核心代码。若 `/start-feature` 或 `/feature` 尚未执行自动闭环，**必须**补跑下列步骤。
+你现在已经完成了核心代码。若 **`/verify` 报告 FAIL**，或 **`/feature` / `/implement-plan` 未执行自动闭环**，**必须**补跑下列步骤。
 
 <!-- keep in sync with templates/_feature-closeout.md -->
-
-你已完成核心实现，**必须**执行下列闭环（禁止跳过）。
 
 ## 0. 架构变更同步（必须）
 
@@ -25,8 +23,10 @@ model: sonnet
 2. 确保 `src/contracts/` 或对应目录有严格 TS 类型定义。
 3. 每个新契约调用 **`register_contract`**（`name`, `description`, `tsFilePath`）。
 
-## 2. 验证
+## 2. 闭环后自检（简要）
+
+完整验收请运行 **`/verify`**。此处仅做闭环后最小确认：
 
 - 每个 `register_contract`：确认 `.ai/INDEX.md` 已更新。
-- 每个 refresh/remove：用 **`search_arch`** 抽检；精读用 **`query_arch`**。
+- 每个 refresh/remove：用 **`search_arch`** 抽检 1–2 项；精读用 **`query_arch`**。
 - 输出 **闭环摘要**：audit 统计、已 refresh 的 assetId 列表、已注册契约列表。

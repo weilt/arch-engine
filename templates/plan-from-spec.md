@@ -99,7 +99,7 @@ model: sonnet
 
 1. 告知用户 plan 的**完整路径**。
 2. 在聊天中用 5–10 行摘要 **Part 1**（寻址结论 + 主要改动文件 + 风险）。
-3. 写明：**请审阅 plan 文件并说「确认」后，使用 `/implement-plan <plan路径>` 开始编码。**
+3. 写明：**请审阅 plan 文件并说「确认」后，使用 `/implement-plan <plan路径>` 开始编码；实现完成后使用 `/verify <plan路径>` 验收。**
 4. **Status** 保持 `draft`，直到用户确认；用户确认后在 plan 内把 `Status` 改为 `approved`（仅改该行，仍不写代码）。
 
 若 spec 与寻址冲突，以 MCP 实证为准，在 Part 1.5 列出需回填 spec 的项。
