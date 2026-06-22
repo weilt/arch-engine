@@ -1,8 +1,8 @@
-# Claude Code 与 Cursor 最佳实践（APT）
+# Claude Code 与多平台最佳实践（APT）
 
 > 面向使用 **Agent-Protocol-Toolkit (APT)** 的业务项目团队。  
 > 目标：让子代理**先查再写**、**做完必登记**、**缺依赖必阻塞**，避免编造接口与视觉。  
-> 适用 IDE：**Claude Code**、**Cursor**（配置方式不同，工作流相同）。
+> 适用 IDE：**Claude Code**、**Cursor**、**Qoder**、**Codex**（配置方式不同，工作流相同）。
 
 ---
 
@@ -35,7 +35,7 @@
 ./scripts/install.sh
 ```
 
-安装会：构建 `arch-engine` / `mcp-server`、部署到 `~/.apt/`、注册 MCP（Cursor + Claude Code）、把 `agent-init` 等加入 PATH。
+安装会：构建 `arch-engine` / `mcp-server`、部署到 `~/.apt/`、注册 MCP（Cursor、Claude Code、Qoder、Codex）、把 `agent-init` 等加入 PATH。
 
 ### 2.2 升级 APT（拉取新提交后）
 
@@ -71,7 +71,35 @@ claude mcp add agent-protocol-mcp -s user -- node $env:USERPROFILE\.apt\mcp-serv
 
 或重跑 `.\scripts\merge-mcp-config.ps1`。
 
-### 2.4 Cursor：验证 MCP
+### 2.5 Qoder：验证 MCP
+
+| 作用域 | 配置文件 |
+|--------|----------|
+| 用户级 | `~/.qoder/settings.json`（`qoder mcp add -s user`） |
+| 项目级 | 项目根 `.mcp.json`（`agent-init` 写入，含 `APT_PROJECT_ROOT`） |
+
+在 Qoder **智能体模式**下确认 `agent-protocol-mcp` 已连接。一次 `/feature` 可能连续调用多个 MCP 工具，建议在 MCP 确认弹窗勾选「后续自动运行」。
+
+```powershell
+qoder mcp add agent-protocol-mcp -s user -- node $env:USERPROFILE\.apt\mcp-server\dist\index.js
+```
+
+工作流斜杠命令位于 `.qoder/commands/`（与 `.claude/commands/` 内容等价，无 `model: sonnet`）。
+
+### 2.6 Codex：验证 MCP
+
+| 作用域 | 配置文件 |
+|--------|----------|
+| 全局 | `~/.codex/config.toml`（`codex mcp add`） |
+| 项目级 | 项目根 `.codex/config.toml`（`agent-init` 写入，**gitignore**） |
+
+```bash
+codex mcp add agent-protocol-mcp -- node ~/.apt/mcp-server/dist/index.js
+```
+
+会话内 `/mcp` 应列出 `query_contract`、`search_arch` 等 13 个工具。工作流使用 `.agents/skills/apt-*/SKILL.md`（如 `apt-feature`）。
+
+### 2.7 Cursor：验证 MCP
 
 | 作用域 | 配置文件 |
 |--------|----------|
@@ -84,7 +112,7 @@ claude mcp add agent-protocol-mcp -s user -- node $env:USERPROFILE\.apt\mcp-serv
 
 修改 MCP 配置后：**Reload MCP** 或重启 Cursor。
 
-### 2.5 新开 IDE 会话
+### 2.8 新开 IDE 会话
 
 安装或升级后重启终端；首次使用建议**新开一个聊天会话**，确认工具列表含 13 个 APT 工具（`query_contract`、`search_arch`、`query_design` 等）。
 
@@ -95,16 +123,17 @@ claude mcp add agent-protocol-mcp -s user -- node $env:USERPROFILE\.apt\mcp-serv
 在**业务项目根目录**执行：
 
 ```bash
-agent-init          # 注入斜杠命令 + .ai/db.json + .mcp.json + .cursor/mcp.json
+agent-init          # 多平台命令/Skills + AGENTS.md + .ai/db.json + MCP 配置
 # 配置 .ai/arch/arch.secrets.json 后：
 start-init          # 首次全量扫描；大仓可用 start-init --full
 ```
 
 `agent-init` 会：
 
-- 从 `~/.apt/templates/` 复制 6 个命令 → `.claude/commands/`（Claude Code 与 Cursor 均读取此目录）
+- 分发 6 个工作流 → `.claude/commands/`、`.qoder/commands/`、`.agents/skills/apt-*/`
+- 幂等写入 `AGENTS.md`（APT 路由片段）
 - 创建 `.ai/db.json`
-- 写入 `.mcp.json` 与 `.cursor/mcp.json`（含 `APT_PROJECT_ROOT=<项目根绝对路径>`）
+- 写入 `.mcp.json`、`.cursor/mcp.json`、`.codex/config.toml`（含 `APT_PROJECT_ROOT`）
 
 **推荐**：用业务项目文件夹作为工作目录打开 IDE，而不是在 `~` 或 APT 工具仓里开发业务功能。
 
@@ -112,10 +141,11 @@ start-init          # 首次全量扫描；大仓可用 start-init --full
 
 | 路径 | 建议 |
 |------|------|
-| `.claude/commands/` | 可提交（团队统一）或每人 `agent-init` 生成 |
+| `.claude/commands/`、`.qoder/commands/`、`.agents/skills/` | 可提交（无本机路径）；或每人 `agent-init` 生成 |
+| `AGENTS.md` | 可提交（含 APT 路由片段） |
 | `.ai/arch/arch.config.json` | 可提交（无密钥） |
 | `.ai/arch/arch.secrets.json` | **勿提交**，加入 `.gitignore` |
-| `.mcp.json` / `.cursor/mcp.json` | **勿提交**（含本机路径）；每人 `agent-init` 生成 |
+| `.mcp.json` / `.cursor/mcp.json` / `.codex/config.toml` | **勿提交**（含本机路径）；每人 `agent-init` 生成 |
 
 ### 3.2 API Key
 
@@ -159,21 +189,21 @@ docs/apt/plans/*-plan.md（Part1 技术方案 + Part2 可执行任务，均含 M
 
 一条命令覆盖：依赖寻址（设计 + 契约 + 架构）→ 开发计划 → 等你确认 → 实现 → **自动闭环**。
 
-### 4.4 仅计划、暂不写代码（legacy）
+### 4.4 实现后验收
 
 ```text
-/start-feature <功能描述>
+/verify [plan路径]
 ```
 
-与 `/feature` 寻址与计划相同；**有 spec 时请改用 `/plan-from-spec`**。
+对照 plan Part 2、只读 `audit_arch_changes`、契约与可检索性检查、跑测试，输出 **Verify Report**。FAIL 时用 **`/finish-feature`** 修复后重新 verify。
 
-### 4.5 漏跑闭环时
+### 4.5 闭环漏跑或 verify 未通过时
 
 ```text
 /finish-feature
 ```
 
-仅当代理实现完成但**未**执行 `audit_arch_changes` / `register_contract` 等时使用。
+当 **`/verify` 报告 FAIL**，或代理实现完成但**未**执行 `audit_arch_changes` / `register_contract` 等时使用。
 
 ---
 
@@ -181,10 +211,10 @@ docs/apt/plans/*-plan.md（Part1 技术方案 + Part2 可执行任务，均含 M
 
 | 场景 | 命令 |
 |------|------|
-| 已有 brainstorming spec | **`/plan-from-spec`** → **`/implement-plan`**（**第三阶段推荐**） |
-| 常规功能开发（无 spec） | **`/feature`** |
-| 只要计划、口头描述 | `/start-feature`（有 spec 时用 `/plan-from-spec`） |
-| 闭环漏跑补救 | `/finish-feature` |
+| 已有 brainstorming spec | **`/plan-from-spec`** → **`/implement-plan`** → **`/verify`**（**第三阶段推荐**） |
+| 常规功能开发（无 spec） | **`/feature`** → **`/verify`** |
+| PR / 交付前验收 | **`/verify`** |
+| 闭环漏跑或 verify FAIL | `/finish-feature` |
 | 立项定视觉、同步设计库 | `/design-system` |
 
 ---

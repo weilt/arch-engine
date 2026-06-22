@@ -1,8 +1,7 @@
 ---
+name: apt-feature
 description: 单命令全流程：寻址 → 计划 → 实现 → 自动闭环（推荐）
-model: sonnet
 ---
-
 你现在是专业子代理，即将开发新功能。请严格按以下步骤执行，禁止跳过。
 
 **若用户已有 brainstorming spec 与 `docs/apt/plans/` 方案：** 改用 **`/implement-plan`**，不要重复本命令的寻址与计划。

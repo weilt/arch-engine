@@ -1,8 +1,6 @@
 ---
 description: 闭环写侧补救（/verify 未通过或 feature/implement-plan 漏跑闭环时使用）
-model: sonnet
 ---
-
 你现在已经完成了核心代码。若 **`/verify` 报告 FAIL**，或 **`/feature` / `/implement-plan` 未执行自动闭环**，**必须**补跑下列步骤。
 
 <!-- keep in sync with templates/_feature-closeout.md -->
