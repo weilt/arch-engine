@@ -61,9 +61,11 @@ brainstorming → spec（docs/superpowers/specs/…）
 **步骤：**
 
 1. 以 plan Part 1 为真源，Part 2 为执行顺序；**不重新臆造**依赖与路径
-2. 逐步实现 Part 2 中带 checkbox 的任务
-3. 完成后执行 `_feature-closeout.md` 闭环（与 `/feature` §3 相同）
-4. 输出闭环摘要
+2. **主 Agent 编排**：按 Part 2 每个 Task **串行派发子 Agent**（implementer → Task Reviewer → 可选 fix，最多 2 轮）；每 Task 含 TDD/测试、微闭环、`git commit`；**禁止**主 Agent inline 实现
+3. 全部 Task Gate 通过后执行 `_feature-closeout.md` 闭环（`audit_arch_changes` 仅此时一次）
+4. 输出闭环摘要；建议 `/verify`
+
+详见 [子 Agent 编排 spec](2026-06-22-apt-subagent-orchestration-design.md)。
 
 ### 3.3 与现有命令关系
 

@@ -50,8 +50,8 @@ APT 用四层机制解决这些问题：
 | 命令 | 用途 |
 |------|------|
 | **`/plan-from-spec`** | **第三阶段推荐**：从 brainstorming spec 经 MCP 寻址生成双 Part 实现方案（不写代码） |
-| **`/implement-plan`** | 按已批准的 `docs/apt/plans/` 方案编码并自动闭环 |
-| **`/feature`** | 无 spec 时一站式：寻址 → 计划 → 实现 → 闭环 |
+| **`/implement-plan`** | 按已批准 plan **编排子 Agent 串行实现**（每 Task 独立上下文）并自动闭环 |
+| **`/feature`** | 无 spec 时一站式：寻址 → 计划 → **子 Agent 编排实现** → 闭环 |
 | **`/verify`** | 实现后验收门禁：对照 plan、只读 audit、契约与可检索性检查、跑测试 |
 | **`/finish-feature`** | `/verify` 未通过或闭环漏跑时的写侧补救 |
 | **`/design-system`** | 立项定视觉：`design-sync` 沉淀到 `.ai/design/` |
@@ -73,7 +73,7 @@ brainstorming → docs/superpowers/specs/*-design.md
        ↓
 /plan-from-spec <spec路径>  →  docs/apt/plans/*-plan.md（Part1 技术方案 + Part2 任务清单）
        ↓ 用户确认，Status → approved
-/implement-plan <plan路径>  →  编码 + 自动闭环
+/implement-plan <plan路径>  →  主 Agent 编排，每 Task 派子 Agent 串行 + 自动闭环
        ↓
 /verify <plan路径>  →  验收门禁（FAIL → /finish-feature）
 ```
@@ -182,6 +182,8 @@ sync-changes
 ---
 
 ## 工作原理
+
+实现阶段（`/feature`、`/implement-plan`）：**主 Agent 只编排**，按 plan Part 2 或 §2.5 Task 列表 **严格串行**派发 implementer 子 Agent（每 Task 全新上下文）→ Task Review Gate → 每 Task `git commit` 与微闭环（`register_contract` / `refresh_asset` / `remove_asset`）→ 全部完成后主 Agent 执行 `audit_arch_changes` 最终 sweep。有 superpowers 时优先加载 `subagent-driven-development`。详见 [子 Agent 编排 spec](docs/superpowers/specs/2026-06-22-apt-subagent-orchestration-design.md)。
 
 ```mermaid
 flowchart TB

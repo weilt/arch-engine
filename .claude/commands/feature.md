@@ -1,9 +1,9 @@
 ---
-description: 单命令全流程：寻址 → 计划 → 实现 → 自动闭环（推荐）
+description: 单命令全流程：寻址 → 计划 → 子 Agent 编排实现 → 自动闭环（推荐）
 model: sonnet
 ---
 
-你现在是专业子代理，即将开发新功能。请严格按以下步骤执行，禁止跳过。
+你是 **APT 编排代理**。寻址与计划由你完成；**实现阶段禁止 inline 编码**，须按 Task 派发子 Agent 串行执行。
 
 **若用户已有 brainstorming spec 与 `docs/apt/plans/` 方案：** 改用 **`/implement-plan`**，不要重复本命令的寻址与计划。
 
@@ -44,13 +44,74 @@ model: sonnet
 
 汇总：功能范围、每个依赖的寻址结果（契约 / 架构文档 + `sourcePath`）、拟改动的模块与文件、风险点。
 
-**等待我说「确认」后再写代码。**
+**等待我说「确认」后再进入实现编排。**
 
-## 3. 实现与自动闭环（必须）
+## 2.5 Task 拆分（用户确认后、派发子 Agent 前）
 
-用户确认后进入实现。当实现完成且可以交付时：
+将 §2 计划拆为 **2–5 分钟粒度** 的 Task 列表（逻辑同 `plan-from-spec` Part 2）：
 
-1. **不要**等待用户输入 `/finish-feature`。
+- 每个 Task 含：checkbox 步骤、**MCP**、**Files**（白名单）、**Verify**、可选 **Contracts**
+- 写入 `.apt/orchestration/progress.md` 初始账本
+- 为 Task 1 准备 `task-1-brief.md`（后续 Task 在 Gate 通过后写 brief）
+
+## 3. 子 Agent 编排实现（必须）
+
+用户确认后：**禁止**亲自写实现代码。遵循 `templates/_subagent-orchestration.md`：
+
+<!-- keep in sync with templates/_subagent-orchestration.md -->
+
+主 Agent **只编排**，禁止亲自实现 Part 2 / 实现 Task 的代码（小范围修 brief、progress、report 路径除外）。
+
+### 0. 子 Agent 能力检查
+
+若当前环境**无法**派发独立子 Agent（如 Cursor `Task`、Claude Code 子代理）：**停止**，提示换支持子 Agent 的环境。**禁止**退化为 inline 实现。
+
+### 1. SDD 与 APT 叠加
+
+- 若可用 **superpowers `subagent-driven-development`** Skill：**优先加载**，按其 implementer → review → fix 节奏。
+- **APT 规则优先于 SDD 冲突项**：MCP 寻址、Task 微闭环、`audit_arch_changes` 仅主 Agent 最终一次、每 Task commit、串行 Gate。
+
+### 2. 账本与 brief（防 compaction 丢状态）
+
+1. 确保 `.apt/orchestration/` 存在；维护 **`progress.md`**（Task 列表、状态、commit SHA、report 路径）。
+2. 每 Task 开始前写 **`task-N-brief.md`**（从 Task 列表摘录：步骤、MCP、Files、Verify、Contracts）。
+3. 记录 **`BASE_SHA`**（派发 implementer 前 `HEAD`）。
+
+有 superpowers 时可用其 `scripts/task-brief`、`scripts/review-package`；**progress 以 APT 账本为准**。
+
+### 3. 串行循环（每个 Task）
+
+**上一 Task Gate 未过，不得派发下一 Task。禁止并行两个 implementer。**
+
+对每个未完成 Task：
+
+#### 3.1 派发 Implementer
+
+- Prompt 基于 `_subagent-implementer-prompt.md`（内联或引用）。
+- 附上 brief 路径、Files 白名单、Verify、report 路径、BASE_SHA 上下文。
+- 内联 **`_task-micro-closeout.md`** 微闭环要求。
+
+#### 3.2 Implementer 回报后
+
+- 若 `BLOCKED` / `NEEDS_CONTEXT` → 停住问用户或补上下文，**不**进 review。
+- 若 `DONE` / `DONE_WITH_CONCERNS` → 继续。
+
+#### 3.3 Task Review Gate
+
+1. 生成 review 包：`git diff BASE_SHA..HEAD` 或 superpowers `review-package`。
+2. 派发 **Task Reviewer**（`_subagent-reviewer-prompt.md`）。
+3. **Spec ✅ 且 Quality Approved** → 更新 `progress.md`（DONE + commit + report）→ **下一 Task**。
+4. **未通过** → 派发 **fix 子 Agent**（同 implementer 规则，附 reviewer 意见）；**最多 2 轮** fix。仍失败 → **BLOCKED**，停住问用户。
+
+### 4. Handoff 报告格式
+
+子 Agent 写满 `.apt/orchestration/task-N-report.md`（格式见 `_subagent-orchestration.md`）。主 Agent 短回报仅含：Status、commits、一行测试摘要、report 路径。
+
+## 4. 最终闭环（必须）
+
+全部 Task Gate 通过后：
+
+1. **不要**等待 `/finish-feature`。
 2. **立即**执行下列闭环（禁止跳过）。
 3. 最终报告单独列出 **「闭环摘要」**。
 
@@ -84,4 +145,4 @@ model: sonnet
 
 闭环摘要输出后，**建议**提示用户运行 **`/verify`** 做完整验收门禁。
 
-若本次仅做计划、尚未写代码，则不要执行闭环。
+若本次仅做计划、尚未派发子 Agent，则不要执行闭环。

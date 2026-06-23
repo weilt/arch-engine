@@ -20,8 +20,8 @@
 
 ### 推荐流程
 
-- 已有 brainstorming spec：`/plan-from-spec` → 用户确认 → `/implement-plan` → `/verify`（FAIL 则 `/finish-feature`）
-- 无 spec：口头描述 → `/feature` → `/verify`（FAIL 则 `/finish-feature`）
+- 已有 brainstorming spec：`/plan-from-spec` → 用户确认 → `/implement-plan`（**每 Task 子 Agent 串行**）→ `/verify`（FAIL 则 `/finish-feature`）
+- 无 spec：口头描述 → `/feature`（实现阶段同上）→ `/verify`（FAIL 则 `/finish-feature`）
 
 ### 依赖寻址（对每个依赖）
 

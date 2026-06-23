@@ -76,24 +76,25 @@ model: sonnet
 
 ## Part 2 — 可执行任务清单
 
-> 每步 2–5 分钟粒度；实现时由 `/implement-plan` 按序执行。
+> 每步 2–5 分钟粒度；实现时由 **`/implement-plan`** **按 Task 派发子 Agent 串行执行**（主 Agent 编排，每 Task 全新上下文 + Task Review Gate）。子 Agent 每 Task 自动 `git commit`（无需在 plan 中写提交步骤）。
 
 ### Task 1: <标题>
 - [ ] <步骤 1>
   - **MCP:** `query_arch` path=`…` 或 `query_contract` name=`…` 或 `query_design` component=`…`
-  - **Files:** `path/to/file`
+  - **Files:** `path/a`, `path/b`（子 Agent 白名单，必填）
 - [ ] <步骤 2>
-  - **Verify:** 如何验证本 task
+  - **Verify:** `npm test -- …` 或具体验证命令（必填）
+  - **Contracts:** （可选）`TypeName` → `src/contracts/foo.ts`
 
 ### Task 2: …
 ```
 
 **Part 2 要求：**
 
-- 每个 Task 至少一个 checkbox 步骤
-- 凡涉及已有契约/架构/设计，步骤必须带 **MCP** 引用（不得空写类名）
+- 每个 Task 至少一个 checkbox 步骤；粒度 **2–5 分钟**，过大 Task 编排失效
+- 每个 Task **必须**含 **Files**（白名单）、**Verify**（验收命令）；涉及已有契约/架构/设计的步骤必须带 **MCP**（不得空写类名）
 - 含测试与验证步骤；是否需要 TDD 按 spec 约定，默认关键逻辑有测试步骤
-- **不要**写「提交 git」步骤，除非用户明确要求
+- **不要**写「提交 git」步骤（子 Agent 每 Task 自动 commit）
 
 ## 3. 交付与门禁
 

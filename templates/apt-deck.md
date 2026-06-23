@@ -81,6 +81,7 @@ README 以下节变更 → 更新 source.md → 重跑 deck：
 - 四层机制表
 - 6 命令 / 13 MCP 工具
 - 工作流（plan-from-spec / implement-plan）
+- **实现阶段子 Agent 串行编排**（README「工作原理」/ implement-plan 模板变更时同步 source.md）
 - 支持平台列表
 
 ## 单页修复

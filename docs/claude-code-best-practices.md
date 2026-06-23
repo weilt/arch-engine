@@ -12,7 +12,7 @@
 |------|------|
 | **MCP 优先** | 查契约、架构、设计一律走 MCP；禁止代理直接打开 `.ai/` 下的文件「偷看」 |
 | **有 spec 先 plan** | brainstorming 产出 spec 后：**`/plan-from-spec` → 审阅 → `/implement-plan`**；不用 superpowers `writing-plans` |
-| **无 spec 再 feature** | 口头描述功能时用 **`/feature`**（寻址 → 计划 → 确认 → 实现 → 闭环） |
+| **无 spec 再 feature** | 口头描述功能时用 **`/feature`**（寻址 → 计划 → 确认 → **子 Agent 编排实现** → 闭环） |
 | **设计先于 UI** | 含前端 UI：先 `query_design` / `search_ui`，缺定义则 `report_design_gap` 并停 UI |
 | **做完必闭环** | 实现后自动 `audit_arch_changes` → refresh/remove → `register_contract`；勿等 `/finish-feature` |
 | **项目根即上下文** | 在**业务项目根**打开 IDE，确保 MCP 读到正确的 `.ai/`（`APT_PROJECT_ROOT`） |
@@ -204,6 +204,22 @@ docs/apt/plans/*-plan.md（Part1 技术方案 + Part2 可执行任务，均含 M
 ```
 
 当 **`/verify` 报告 FAIL**，或代理实现完成但**未**执行 `audit_arch_changes` / `register_contract` 等时使用。
+
+---
+
+### 4.6 子 Agent 编排（实现阶段）
+
+`/implement-plan` 与 `/feature` 的**实现阶段**由主 Agent 编排，**禁止 inline 写大段实现代码**：
+
+1. 将工作拆为 **2–5 分钟** Task（plan Part 2 或 `/feature` §2.5）
+2. **严格串行**：每 Task 派发全新 implementer 子 Agent → 测试绿 → Task 微闭环 → `git commit` → Task Reviewer Gate
+3. 子 Agent：**只读 MCP** + Task 末 `register_contract` / `refresh_asset` / `remove_asset`；**禁止** `audit_arch_changes`
+4. 全 Task 通过后：主 Agent **`audit_arch_changes`** 最终 sweep（`_feature-closeout`）
+5. 无子 Agent 能力的环境：**停止**，不换 inline 实现
+
+有 superpowers 时优先加载 **`subagent-driven-development`**；APT MCP 规则优先。运行时账本：`.apt/orchestration/progress.md`、`task-N-brief.md`、`task-N-report.md`。
+
+Spec：[2026-06-22-apt-subagent-orchestration-design.md](superpowers/specs/2026-06-22-apt-subagent-orchestration-design.md)
 
 ---
 
