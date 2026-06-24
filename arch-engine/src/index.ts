@@ -164,6 +164,17 @@ export {
 } from "./design/implementations.js";
 
 export {
+  auditDesignChanges,
+  type AuditDesignChangesOptions,
+  type AuditDesignChangesResult,
+  type AuditDesignStaleItem,
+  type AuditDesignMissingBindingItem,
+  type AuditDesignPageGapItem,
+  type AuditDesignUndeclaredImplementationItem,
+  type AuditDesignTokenViolationItem,
+} from "./design/audit.js";
+
+export {
   runDesignSync,
 } from "./design/sync.js";
 

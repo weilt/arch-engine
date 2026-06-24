@@ -16,6 +16,7 @@ import { handleQueryDesign } from "./design-query.js";
 import { handleSearchUi } from "./design-search.js";
 import { handleReportDesignGap } from "./design-gap.js";
 import { handleRegisterUiPattern } from "./design-register.js";
+import { handleAuditDesignChanges } from "./design-audit.js";
 
 const projectRoot = getProjectRoot();
 
@@ -376,6 +377,32 @@ server.tool(
     } catch (err) {
       return {
         content: [{ type: "text" as const, text: String(err) }],
+        isError: true,
+      };
+    }
+  }
+);
+
+server.tool(
+  "audit_design_changes",
+  "Read-only audit of design knowledge drift (stale sync, bindings, page gaps, implementations, token violations)",
+  {
+    sourcePaths: z
+      .array(z.string())
+      .optional()
+      .describe(
+        "Optional source paths (files or dirs) to scan for hard-coded #hex and Npx token violations"
+      ),
+  },
+  async ({ sourcePaths }) => {
+    try {
+      const result = await handleAuditDesignChanges(projectRoot, { sourcePaths });
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+      };
+    } catch (err) {
+      return {
+        content: [{ type: "text" as const, text: `❌ ${String(err)}` }],
         isError: true,
       };
     }
