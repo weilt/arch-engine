@@ -191,3 +191,25 @@ export interface DesignVectorHit {
   score: number;
   snippet?: string;
 }
+
+export interface UiPatternImplementation {
+  page: string;
+  sourcePath: string;
+  componentsUsed: string[];
+  notes?: string;
+  registeredAt: string;
+}
+
+export interface RegisterUiPatternInput {
+  page: string;
+  sourcePath: string;
+  componentsUsed: string[];
+  notes?: string;
+}
+
+export interface RegisterUiPatternResult {
+  ok: true;
+  page: string;
+  path: string;
+  record: UiPatternImplementation;
+}

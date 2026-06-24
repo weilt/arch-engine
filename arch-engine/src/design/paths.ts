@@ -43,3 +43,7 @@ export function getDesignVectorsDbPath(projectRoot: string): string {
 export function getDesignIngestStatePath(projectRoot: string): string {
   return path.join(getDesignDir(projectRoot), "ingest-state.json");
 }
+
+export function getDesignImplementationsDir(projectRoot: string): string {
+  return path.join(getDesignDir(projectRoot), "implementations");
+}

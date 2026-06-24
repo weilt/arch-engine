@@ -117,6 +117,7 @@ export {
   getDesignProfilePath,
   getDesignVectorsDbPath,
   getFrameworkBindingsPath,
+  getDesignImplementationsDir,
 } from "./design/paths.js";
 
 export {
@@ -154,6 +155,13 @@ export {
   appendDesignGap,
   readDesignProfile,
 } from "./design/query.js";
+
+export {
+  registerUiPattern,
+  readUiPattern,
+  listUiPatterns,
+  getUiPatternFilePath,
+} from "./design/implementations.js";
 
 export {
   runDesignSync,
@@ -196,4 +204,7 @@ export type {
   DesignGapRequest,
   DesignIndexResult,
   DesignVectorHit,
+  UiPatternImplementation,
+  RegisterUiPatternInput,
+  RegisterUiPatternResult,
 } from "./design/types.js";

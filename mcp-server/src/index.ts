@@ -15,6 +15,7 @@ import { handleSyncArchChanges } from "./sync-changes.js";
 import { handleQueryDesign } from "./design-query.js";
 import { handleSearchUi } from "./design-search.js";
 import { handleReportDesignGap } from "./design-gap.js";
+import { handleRegisterUiPattern } from "./design-register.js";
 
 const projectRoot = getProjectRoot();
 
@@ -371,6 +372,37 @@ server.tool(
       const text = await handleReportDesignGap(projectRoot, { need, reason, page });
       return {
         content: [{ type: "text" as const, text }],
+      };
+    } catch (err) {
+      return {
+        content: [{ type: "text" as const, text: String(err) }],
+        isError: true,
+      };
+    }
+  }
+);
+
+server.tool(
+  "register_ui_pattern",
+  "Register UI implementation mapping from design page recipe to source file (finish-feature closure)",
+  {
+    page: z.string().describe("Design page recipe slug, e.g. user-settings"),
+    sourcePath: z.string().describe("Implementation source path relative to project root"),
+    componentsUsed: z
+      .array(z.string())
+      .describe("Semantic component ids used in the implementation"),
+    notes: z.string().optional().describe("Optional implementation notes"),
+  },
+  async ({ page, sourcePath, componentsUsed, notes }) => {
+    try {
+      const result = await handleRegisterUiPattern(projectRoot, {
+        page,
+        sourcePath,
+        componentsUsed,
+        notes,
+      });
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
       };
     } catch (err) {
       return {
