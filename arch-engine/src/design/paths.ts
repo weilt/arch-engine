@@ -47,3 +47,7 @@ export function getDesignIngestStatePath(projectRoot: string): string {
 export function getDesignImplementationsDir(projectRoot: string): string {
   return path.join(getDesignDir(projectRoot), "implementations");
 }
+
+export function getArchAlignmentPath(projectRoot: string): string {
+  return path.join(getDesignDir(projectRoot), "arch-alignment.json");
+}

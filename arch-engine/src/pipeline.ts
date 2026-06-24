@@ -58,6 +58,8 @@ import {
   type ArchIndex,
 } from "./writer/index.js";
 import { writeModuleAssetDocs } from "./writer/asset-md.js";
+import { buildDesignArchAlignment } from "./design/alignment.js";
+import { getDesignProfilePath } from "./design/paths.js";
 
 export type StartInitReport =
   | { status: "config-created" }
@@ -578,6 +580,23 @@ export async function runStartInit(
     assetCardCount: allAssetCards.length,
     incremental,
   });
+
+  try {
+    await fs.access(getDesignProfilePath(projectRoot));
+    const alignment = await buildDesignArchAlignment(projectRoot, model.packages, {
+      designSystemPackages: config.designSystemPackages,
+    });
+    archLog.info("start-init: design-arch alignment written", {
+      uiPackages: alignment.uiPackages.length,
+      suggestions: alignment.suggestions.length,
+    });
+  } catch (e: unknown) {
+    if ((e as NodeJS.ErrnoException).code !== "ENOENT") {
+      archLog.warn("start-init: design-arch alignment skipped", {
+        reason: e instanceof Error ? e.message : String(e),
+      });
+    }
+  }
 
   return {
     status: "ok",

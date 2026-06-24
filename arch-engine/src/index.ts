@@ -118,6 +118,7 @@ export {
   getDesignVectorsDbPath,
   getFrameworkBindingsPath,
   getDesignImplementationsDir,
+  getArchAlignmentPath,
 } from "./design/paths.js";
 
 export {
@@ -173,6 +174,16 @@ export {
   type AuditDesignUndeclaredImplementationItem,
   type AuditDesignTokenViolationItem,
 } from "./design/audit.js";
+
+export {
+  buildDesignArchAlignment,
+  buildDesignArchAlignmentReport,
+  readArchAlignmentReport,
+  type ArchAlignmentReport,
+  type ArchAlignmentSuggestion,
+  type ArchAlignmentConfidence,
+  type BuildDesignArchAlignmentOptions,
+} from "./design/alignment.js";
 
 export {
   runDesignSync,
