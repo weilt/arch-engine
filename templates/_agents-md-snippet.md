@@ -17,6 +17,7 @@
 | 实现后验收 | `/verify` | `apt-verify` |
 | 闭环补救 | `/finish-feature` | `apt-finish-feature` |
 | 设计系统同步 | `/design-system` | `apt-design-system` |
+| 单页设计定稿 | `/design-page` | `apt-design-page` |
 
 ### 推荐流程
 

@@ -55,8 +55,8 @@ describe("inject-platform-assets", () => {
     assert.equal(skillNameFromFile("plan-from-spec.md"), "apt-plan-from-spec");
   });
 
-  it("PUBLIC_TEMPLATES has six entries", () => {
-    assert.equal(PUBLIC_TEMPLATES.size, 6);
+  it("PUBLIC_TEMPLATES has seven entries", () => {
+    assert.equal(PUBLIC_TEMPLATES.size, 7);
   });
 });
 
@@ -108,11 +108,11 @@ describe("injectPlatformAssets integration", () => {
 
     assert.equal(
       fs.readdirSync(path.join(projectRoot, ".claude", "commands")).length,
-      6
+      7
     );
     assert.equal(
       fs.readdirSync(path.join(projectRoot, ".qoder", "commands")).length,
-      6
+      7
     );
     assert(!fs.existsSync(path.join(projectRoot, ".claude", "commands", "_feature-closeout.md")));
   });

@@ -11,6 +11,7 @@ const PUBLIC_TEMPLATES = new Set([
   "verify.md",
   "finish-feature.md",
   "design-system.md",
+  "design-page.md",
 ]);
 
 function parseFrontmatter(content) {

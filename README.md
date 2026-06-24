@@ -55,6 +55,7 @@ APT 用四层机制解决这些问题：
 | **`/verify`** | 实现后验收门禁：对照 plan、只读 audit、契约与可检索性检查、跑测试 |
 | **`/finish-feature`** | `/verify` 未通过或闭环漏跑时的写侧补救 |
 | **`/design-system`** | 立项定视觉：`design-sync` 沉淀到 `.ai/design/` |
+| **`/design-page`** | 单页原型定稿：`design-sync --pages-only`，可选 `design-bindings --check` |
 
 > **迁移：** `/start-feature` 已移除。无 spec 请用 `/feature`；有 spec 请用 `/plan-from-spec` → `/implement-plan`。实现后请用 `/verify` 验收。
 
@@ -133,6 +134,7 @@ Windows 另有同名 `.cmd`（如 `agent-init.cmd`）。安装脚本会把 `~/.a
 - **`search_ui`**：关键词搜索语义组件与页面模板
 - **`report_design_gap`**：缺设计定义时阻塞 UI 实现（对标 `report_missing`）
 - **`/design-system`**：引导定风格 → `design-sync` → `design-bindings`
+- **`/design-page`**：单页 baoyu 原型定稿 → `design-sync --pages-only` → 可选 `design-bindings --check`
 - **`/feature` §0.5**：含 UI 的任务自动走设计寻址
 
 本仓库自带参考夹具 **`designs/apt-reference-ds/`**（8 语义组件、2 页面配方），狗食测试见 `arch-engine/tests/dogfood/design-workflow.test.ts`。
