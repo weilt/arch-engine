@@ -115,6 +115,7 @@ export { readLastScan, writeLastScan } from "./incremental/last-scan.js";
 export {
   getDesignDir,
   getDesignProfilePath,
+  getDesignVectorsDbPath,
 } from "./design/paths.js";
 
 export {
@@ -135,6 +136,15 @@ export {
   runDesignSync,
 } from "./design/sync.js";
 
+export {
+  KEYWORD_FALLBACK_THRESHOLD,
+  chunkStyleMarkdown,
+  collectDesignChunks,
+  indexDesignKnowledge,
+  reindexDesignIds,
+  searchDesignVectors,
+} from "./design/vectors.js";
+
 export type {
   DesignSyncOptions,
   DesignSyncReport,
@@ -149,4 +159,6 @@ export type {
   SearchUiOptions,
   SearchUiHit,
   DesignGapRequest,
+  DesignIndexResult,
+  DesignVectorHit,
 } from "./design/types.js";

@@ -16,6 +16,7 @@ import {
 } from "./paths.js";
 import { assertDesignId } from "./ids.js";
 import type { DesignProfile, DesignSyncOptions, DesignSyncReport } from "./types.js";
+import { indexDesignKnowledge } from "./vectors.js";
 
 async function writeJson(filePath: string, data: unknown, dryRun: boolean): Promise<void> {
   const text = JSON.stringify(data, null, 2);
@@ -120,6 +121,16 @@ export async function runDesignSync(
 
   if (!dryRun && !pagesOnly) {
     await writeJson(getDesignProfilePath(projectRoot), profile, false);
+  }
+
+  if (!dryRun) {
+    const indexResult = await indexDesignKnowledge(projectRoot);
+    if (indexResult.warning) {
+      profile.warnings.push(indexResult.warning);
+      if (!pagesOnly) {
+        await writeJson(getDesignProfilePath(projectRoot), profile, false);
+      }
+    }
   }
 
   return {

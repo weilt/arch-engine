@@ -96,3 +96,17 @@ export interface DesignGapRequest {
   reason: string;
   reportedAt: string;
 }
+
+export interface DesignIndexResult {
+  indexed: number;
+  skipped: boolean;
+  warning?: string;
+}
+
+export interface DesignVectorHit {
+  kind: "component" | "page";
+  id: string;
+  title: string;
+  score: number;
+  snippet?: string;
+}

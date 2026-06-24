@@ -31,3 +31,7 @@ export function getDesignRefsDir(projectRoot: string): string {
 export function getDesignGapsPath(projectRoot: string): string {
   return path.join(getDesignDir(projectRoot), "gaps.json");
 }
+
+export function getDesignVectorsDbPath(projectRoot: string): string {
+  return path.join(getDesignDir(projectRoot), "design-vectors.db");
+}

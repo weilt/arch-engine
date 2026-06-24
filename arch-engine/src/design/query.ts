@@ -19,6 +19,10 @@ import type {
   SearchUiHit,
   SearchUiOptions,
 } from "./types.js";
+import {
+  KEYWORD_FALLBACK_THRESHOLD,
+  searchDesignVectors,
+} from "./vectors.js";
 
 export async function readDesignProfile(projectRoot: string): Promise<DesignProfile> {
   try {
@@ -171,7 +175,36 @@ export async function searchUi(
     }
   }
 
-  return hits.sort((a, b) => b.score - a.score).slice(0, limit);
+  const sorted = hits.sort((a, b) => b.score - a.score);
+  const topScore = sorted[0]?.score ?? 0;
+
+  if (topScore >= KEYWORD_FALLBACK_THRESHOLD) {
+    return sorted.slice(0, limit);
+  }
+
+  const vectorHits = await searchDesignVectors(
+    projectRoot,
+    options.query,
+    limit,
+    kindFilter
+  );
+  if (vectorHits.length === 0) {
+    return sorted.slice(0, limit);
+  }
+
+  const combined: SearchUiHit[] = [...sorted];
+  for (const v of vectorHits) {
+    if (combined.some((h) => h.kind === v.kind && h.id === v.id)) continue;
+    combined.push({
+      kind: v.kind,
+      id: v.id,
+      title: v.title,
+      score: v.score * 10,
+      snippet: v.snippet,
+    });
+  }
+
+  return combined.sort((a, b) => b.score - a.score).slice(0, limit);
 }
 
 export async function appendDesignGap(
