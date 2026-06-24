@@ -92,7 +92,7 @@ export interface DesignPageRecipe {
 
 export interface DesignSyncOptions {
   source?: string;
-  adapter?: "baoyu" | "html";
+  adapter?: "baoyu" | "html" | "figma";
   dryRun?: boolean;
   pagesOnly?: boolean;
   incremental?: boolean;

@@ -6,8 +6,9 @@ function printHelp(): void {
   console.log(`Usage: design-sync [projectRoot] [options]
 
 Options:
-  --adapter <name>   Ingest adapter: baoyu (default) or html
-  --source <path>    Baoyu designs folder (default: designs) or HTML file with --adapter html
+  --adapter <name>   Ingest adapter: baoyu (default), html, or figma
+  --source <path>    Baoyu designs folder (default: designs); HTML file with --adapter html;
+                     figma-export.json or fileKey with --adapter figma
   --dry-run          Report without writing .ai/design/
   --pages-only       Update pages/ and refs/ only
   --incremental      Update only changed source files (falls back to full sync without prior state)
@@ -18,7 +19,7 @@ Options:
 function parseArgs(argv: string[]): {
   projectRoot: string;
   source?: string;
-  adapter?: "baoyu" | "html";
+  adapter?: "baoyu" | "html" | "figma";
   dryRun: boolean;
   pagesOnly: boolean;
   incremental: boolean;
@@ -28,7 +29,7 @@ function parseArgs(argv: string[]): {
   let pagesOnly = false;
   let incremental = false;
   let source: string | undefined;
-  let adapter: "baoyu" | "html" | undefined;
+  let adapter: "baoyu" | "html" | "figma" | undefined;
   const positional: string[] = [];
 
   for (let i = 0; i < args.length; i++) {
@@ -47,8 +48,8 @@ function parseArgs(argv: string[]): {
     }
     if (a === "--adapter") {
       const value = args[++i];
-      if (value !== "baoyu" && value !== "html") {
-        throw new Error(`Unknown adapter: ${value}. Use baoyu or html.`);
+      if (value !== "baoyu" && value !== "html" && value !== "figma") {
+        throw new Error(`Unknown adapter: ${value}. Use baoyu, html, or figma.`);
       }
       adapter = value;
       continue;

@@ -1,0 +1,17 @@
+{
+  "fileKey": "mock-file-key-001",
+  "name": "APT Reference DS",
+  "exportedAt": "2026-06-24T00:00:00.000Z",
+  "variables": [
+    { "name": "color/primary", "value": "#3366FF", "resolvedType": "COLOR" },
+    { "name": "color/background", "value": "#FFFFFF", "resolvedType": "COLOR" },
+    { "name": "spacing/md", "value": "16", "resolvedType": "FLOAT" },
+    { "name": "fontFamily/base", "value": "Inter, sans-serif", "resolvedType": "STRING" },
+    { "name": "radius/sm", "value": "4", "resolvedType": "FLOAT" }
+  ],
+  "components": [
+    { "name": "PrimaryButton", "key": "comp-primary-btn", "description": "Main call-to-action" },
+    { "name": "Card", "key": "comp-card", "description": "Grouped content surface" },
+    { "name": "icons/close", "key": "comp-icon-close", "description": "Close icon" }
+  ]
+}

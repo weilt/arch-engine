@@ -5,6 +5,7 @@ import {
   ingestBaoyuSource,
   readBaoyuMeta,
 } from "./ingest/baoyu.js";
+import { ingestFigmaSource } from "./ingest/figma.js";
 import { ingestHtmlSource } from "./ingest/html.js";
 import {
   getDesignComponentsDir,
@@ -120,12 +121,93 @@ async function runHtmlDesignSync(
   };
 }
 
+async function runFigmaDesignSync(
+  projectRoot: string,
+  options: DesignSyncOptions
+): Promise<DesignSyncReport> {
+  const dryRun = options.dryRun ?? false;
+  const sourceRel = options.source;
+  if (!sourceRel) {
+    throw new Error(
+      "Figma adapter requires --source path/to/figma-export.json or a fileKey with FIGMA_ACCESS_TOKEN"
+    );
+  }
+
+  const ingested = await ingestFigmaSource(projectRoot, sourceRel);
+  const designDir = getDesignDir(projectRoot);
+  const syncedAt = new Date().toISOString();
+
+  const profile: DesignProfile = {
+    ...ingested.profile,
+    syncedAt,
+    componentCount: ingested.components.length,
+    pageCount: 0,
+    warnings: ingested.warnings,
+    sourceMtimeMs: ingested.sourceMtimeMs,
+  };
+
+  const tokenFiles: string[] = [];
+
+  await writeJson(getDesignProfilePath(projectRoot), profile, dryRun);
+  if (!dryRun) {
+    await fs.mkdir(designDir, { recursive: true });
+  }
+
+  for (const [bucket, values] of Object.entries(ingested.tokens)) {
+    if (Object.keys(values).length === 0) continue;
+    const fileName = `${bucket}.json`;
+    tokenFiles.push(fileName);
+    await writeJson(path.join(getDesignTokensDir(projectRoot), fileName), values, dryRun);
+  }
+
+  for (const card of ingested.components) {
+    assertDesignId(card.id, "component");
+    await writeJson(
+      path.join(getDesignComponentsDir(projectRoot), `${card.id}.json`),
+      card,
+      dryRun
+    );
+  }
+
+  if (ingested.refFile) {
+    await copyRef(
+      ingested.refFile.absPath,
+      getDesignRefsDir(projectRoot),
+      ingested.refFile.name,
+      dryRun
+    );
+  }
+
+  if (!dryRun) {
+    await writeJson(getDesignProfilePath(projectRoot), profile, false);
+
+    const indexResult = await indexDesignKnowledge(projectRoot);
+    if (indexResult.warning) {
+      profile.warnings.push(indexResult.warning);
+      await writeJson(getDesignProfilePath(projectRoot), profile, false);
+    }
+  }
+
+  return {
+    profile,
+    componentsWritten: ingested.components.length,
+    pagesWritten: 0,
+    tokenFiles,
+    warnings: profile.warnings,
+    dryRun,
+  };
+}
+
 export async function runDesignSync(
   projectRoot: string,
   options: DesignSyncOptions = {}
 ): Promise<DesignSyncReport> {
   if (options.adapter === "html") {
     return runHtmlDesignSync(projectRoot, options);
+  }
+
+  if (options.adapter === "figma") {
+    return runFigmaDesignSync(projectRoot, options);
   }
 
   if (options.incremental) {
