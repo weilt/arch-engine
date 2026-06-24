@@ -1,5 +1,7 @@
 # Design Knowledge Layer（设计知识层）设计规格
 
+> **补齐规格：** Phase 1–3 完整愿景与波次交付见 [2026-06-24-design-knowledge-layer-completion-design.md](./2026-06-24-design-knowledge-layer-completion-design.md)。
+
 **日期:** 2026-06-16  
 **状态:** 已批准（brainstorming 三节，待用户审阅 spec 文件）  
 **关系:** 扩展 APT `/feature` 寻址闭环；与 `.ai/arch/` 并行，不合并  

@@ -35,7 +35,7 @@ APT 用四层机制解决这些问题：
 | 层级 | 作用 |
 |------|------|
 | **Custom Commands** | 6 个斜杠命令；有 brainstorming spec 时 **`/plan-from-spec` → `/implement-plan`**，否则 **`/feature`**（见下方工作流） |
-| **MCP Server** | 契约 / 架构 / 设计共 **13** 个工具，代理必须调用 |
+| **MCP Server** | 契约 / 架构 / 设计共 **15** 个工具，代理必须调用 |
 | **架构引擎** | `start-init` 扫描代码，生成可检索的架构文档 + 向量库 |
 | **项目数据** | `.ai/db.json`、`.ai/arch/`、`.ai/design/` 存契约、架构与设计知识 |
 
@@ -89,13 +89,13 @@ brainstorming → docs/superpowers/specs/*-design.md
 |------|------|
 | **`agent-init`** | 项目初始化：多平台命令/Skills、`AGENTS.md`、`.ai/db.json`、MCP 配置（含 `.codex/config.toml`） |
 | **`start-init`** | 扫描代码生成 `.ai/arch/`（Markdown + 向量索引） |
-| **`design-sync`** | 将 `designs/` 设计真源同步到 `.ai/design/` |
+| **`design-sync`** | 将设计真源同步到 `.ai/design/`（`--adapter baoyu`/`html`/`figma`，`--incremental`） |
 | **`design-bindings`** | 按 Vue/React 框架与 UI 库生成 `framework-bindings.json`（如 element-plus、antd） |
 | **`sync-changes`** | 架构变更批量同步（等同 MCP `sync_arch_changes`） |
 
 Windows 另有同名 `.cmd`（如 `agent-init.cmd`）。安装脚本会把 `~/.apt/bin` 加入 PATH。
 
-### MCP 工具（13）
+### MCP 工具（15）
 
 由 **`agent-protocol-mcp`**（`~/.apt/mcp-server/dist/index.js`）提供。
 
@@ -114,6 +114,8 @@ Windows 另有同名 `.cmd`（如 `agent-init.cmd`）。安装脚本会把 `~/.a
 | 设计 | `query_design` | 查全局 token/样式、页面配方或语义组件 |
 | 设计 | `search_ui` | 搜索 UI 组件与页面配方 |
 | 设计 | `report_design_gap` | 报告设计缺口并阻塞臆造 UI |
+| 设计 | `register_ui_pattern` | 登记页面实现与配方映射（闭环写侧） |
+| 设计 | `audit_design_changes` | 只读审计设计知识漂移（stale、bindings、token 等） |
 
 ---
 
@@ -140,8 +142,15 @@ Windows 另有同名 `.cmd`（如 `agent-init.cmd`）。安装脚本会把 `~/.a
 本仓库自带参考夹具 **`designs/apt-reference-ds/`**（8 语义组件、2 页面配方），狗食测试见 `arch-engine/tests/dogfood/design-workflow.test.ts`。
 
 ```powershell
-# baoyu 定稿后同步（默认读 designs/）
+# baoyu 定稿后同步（默认 --adapter baoyu，读 designs/）
 design-sync --source designs/my-app
+
+# HTML 单页或 Figma 导出 ingest
+design-sync --adapter html --source designs/pages/foo.html
+design-sync --adapter figma --source designs/figma-export.json
+
+# 增量同步（仅更新变更源文件；无 prior state 时回退全量）
+design-sync --incremental
 
 # 选定 Vue + Element Plus 后生成 bindings
 design-bindings --framework vue --library element-plus
@@ -309,7 +318,7 @@ agent-init
 # 2. 配置 API Key（见下一节），然后扫描架构
 start-init
 
-# 3. 新开 IDE / Codex 会话，确认 agent-protocol-mcp 已连接（13 个 APT 工具）
+# 3. 新开 IDE / Codex 会话，确认 agent-protocol-mcp 已连接（15 个 APT 工具）
 ```
 
 Windows 可用 `agent-init.cmd`、`start-init.cmd`。
@@ -724,7 +733,7 @@ arch-engine/               # GitHub 仓库名（含完整 APT 工具集）
 - [x] 配置文件内 API Key（无需环境变量）
 - [x] `arch.config.json` 启动时必填字段校验
 - [x] Windows / macOS 安装脚本
-- [x] 设计知识层（`.ai/design/`、`design-sync`、设计 MCP 三工具）
+- [x] 设计知识层（`.ai/design/`、`design-sync`、`register_ui_pattern`、`audit_design_changes` 等设计 MCP）
 - [x] Spec → Plan → Implement（`/plan-from-spec`、`/implement-plan`，方案 C）
 
 **计划中：**
