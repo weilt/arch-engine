@@ -57,6 +57,19 @@ export interface GenerateFrameworkBindingsReport {
   dryRun: boolean;
 }
 
+export interface BindingsCheckWarning {
+  code: "missing_bindings" | "orphan_bindings" | "no_bindings_file" | "ui_library_not_set";
+  message: string;
+  ids?: string[];
+}
+
+export interface BindingsCheckReport {
+  ok: boolean;
+  warnings: BindingsCheckWarning[];
+  uiLibrary?: string;
+  framework?: string;
+}
+
 export interface DesignComponentCard {
   id: string;
   role?: string;
@@ -128,6 +141,7 @@ export interface QueryDesignGlobalResult {
 export interface QueryDesignComponentResult {
   kind: "component";
   component: DesignComponentCard;
+  binding: FrameworkBindingEntry | null;
   stale: boolean;
 }
 

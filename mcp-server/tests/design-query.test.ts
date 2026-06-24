@@ -5,7 +5,7 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { runDesignSync, MissingDesignProfileError } from "@apt/arch-engine";
+import { runDesignSync, MissingDesignProfileError, generateFrameworkBindings } from "@apt/arch-engine";
 
 async function seedDesign(tmpRoot: string): Promise<void> {
   const dsDir = path.join(tmpRoot, "designs", "ui-ds");
@@ -38,6 +38,9 @@ describe("design MCP handlers", () => {
     await seedDesign(tmpRoot);
     const result = await handleQueryDesign(tmpRoot, { scope: "global" });
     expect(result.kind).toBe("global");
+    if (result.kind === "global") {
+      expect(result.bindings).toBeNull();
+    }
   });
 
   it("search_ui finds component", async () => {
@@ -64,6 +67,16 @@ describe("design MCP handlers", () => {
       await fs.readFile(path.join(tmpRoot, ".ai", "design", "gaps.json"), "utf-8")
     );
     expect(gaps).toHaveLength(1);
+  });
+
+  it("query_design component returns binding when bindings exist", async () => {
+    await seedDesign(tmpRoot);
+    await generateFrameworkBindings(tmpRoot, { framework: "react", library: "antd" });
+    const result = await handleQueryDesign(tmpRoot, { component: "PrimaryButton" });
+    expect(result.kind).toBe("component");
+    if (result.kind === "component") {
+      expect(result.binding?.react?.component).toBe("Button");
+    }
   });
 
   it("rejects conflicting query_design parameters", async () => {

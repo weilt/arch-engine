@@ -124,6 +124,8 @@ export {
   readFrameworkBindings,
   listSupportedLibraries,
   resolveLibraryTemplate,
+  resolveComponentBinding,
+  checkFrameworkBindings,
   LIBRARY_TEMPLATES,
 } from "./design/bindings.js";
 
@@ -135,6 +137,8 @@ export type {
   FrameworkBindingsMeta,
   GenerateFrameworkBindingsOptions,
   GenerateFrameworkBindingsReport,
+  BindingsCheckReport,
+  BindingsCheckWarning,
 } from "./design/types.js";
 
 export {

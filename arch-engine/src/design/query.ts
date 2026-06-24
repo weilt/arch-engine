@@ -10,7 +10,8 @@ import {
   getDesignStylePath,
   getDesignTokensDir,
 } from "./paths.js";
-import type { DesignComponentCard, DesignGapRequest, DesignPageRecipe, DesignProfile } from "./types.js";
+import { readFrameworkBindings, resolveComponentBinding } from "./bindings.js";
+import type { DesignComponentCard, DesignGapRequest, DesignPageRecipe, DesignProfile, FrameworkBindingEntry } from "./types.js";
 import { assertDesignId } from "./ids.js";
 import { MissingDesignProfileError, DesignComponentNotFoundError, DesignPageNotFoundError } from "./errors.js";
 import type {
@@ -89,7 +90,12 @@ export async function queryDesign(
       path.join(getDesignComponentsDir(projectRoot), `${options.component}.json`)
     );
     if (!card) throw new DesignComponentNotFoundError(options.component);
-    return { kind: "component", component: card, stale };
+    const bindings = await readFrameworkBindings(projectRoot);
+    const binding: FrameworkBindingEntry | null = resolveComponentBinding(
+      bindings,
+      options.component
+    );
+    return { kind: "component", component: card, binding, stale };
   }
 
   if (options.page) {
@@ -113,7 +119,8 @@ export async function queryDesign(
 
   const style = await fs.readFile(getDesignStylePath(projectRoot), "utf-8").catch(() => "");
   const tokens = await loadAllTokens(projectRoot);
-  return { kind: "global", profile, style, tokens, stale };
+  const bindings = await readFrameworkBindings(projectRoot);
+  return { kind: "global", profile, style, tokens, bindings, stale };
 }
 
 function scoreText(query: string, text: string): number {

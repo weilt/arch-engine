@@ -191,7 +191,7 @@ function vectorHitToDesignHit(hit: SearchHit): DesignVectorHit | null {
     return {
       kind: "page",
       id,
-      title: hit.title || id,
+      title: id,
       score: hit.score,
     };
   }

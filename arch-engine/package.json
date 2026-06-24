@@ -7,7 +7,8 @@
   "bin": {
     "start-init": "dist/cli.js",
     "sync-changes": "dist/cli-sync.js",
-    "design-sync": "dist/cli-design-sync.js"
+    "design-sync": "dist/cli-design-sync.js",
+    "design-bindings": "dist/cli-design-bindings.js"
   },
   "exports": {
     ".": "./dist/index.js"
