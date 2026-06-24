@@ -116,7 +116,26 @@ export {
   getDesignDir,
   getDesignProfilePath,
   getDesignVectorsDbPath,
+  getFrameworkBindingsPath,
 } from "./design/paths.js";
+
+export {
+  generateFrameworkBindings,
+  readFrameworkBindings,
+  listSupportedLibraries,
+  resolveLibraryTemplate,
+  LIBRARY_TEMPLATES,
+} from "./design/bindings.js";
+
+export type {
+  DesignPreferences,
+  FrameworkBindingEntry,
+  FrameworkBindingTarget,
+  FrameworkBindingsFile,
+  FrameworkBindingsMeta,
+  GenerateFrameworkBindingsOptions,
+  GenerateFrameworkBindingsReport,
+} from "./design/types.js";
 
 export {
   MissingDesignProfileError,
@@ -137,6 +156,16 @@ export {
 } from "./design/sync.js";
 
 export {
+  detectChangedSources,
+  detectChangedSourcesForProject,
+  classifyAffectedTargets,
+  readIngestState,
+  runIncrementalDesignSync,
+  snapshotSourceFiles,
+  writeIngestState,
+} from "./design/incremental.js";
+
+export {
   KEYWORD_FALLBACK_THRESHOLD,
   chunkStyleMarkdown,
   collectDesignChunks,
@@ -148,6 +177,8 @@ export {
 export type {
   DesignSyncOptions,
   DesignSyncReport,
+  DesignIngestState,
+  ChangedSources,
 } from "./design/types.js";
 
 export type {

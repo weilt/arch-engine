@@ -1,3 +1,10 @@
+export interface DesignPreferences {
+  productType?: string;
+  framework?: "react" | "vue";
+  uiLibrary?: string;
+  styleNotes?: string;
+}
+
 export interface DesignProfile {
   version: 1;
   primarySource: { tool: string; path: string };
@@ -7,6 +14,47 @@ export interface DesignProfile {
   componentCount: number;
   pageCount: number;
   warnings: string[];
+  preferences?: DesignPreferences;
+}
+
+export interface FrameworkBindingTarget {
+  import: string;
+  component: string;
+  props?: Record<string, unknown>;
+  notes?: string;
+}
+
+export interface FrameworkBindingEntry {
+  react?: FrameworkBindingTarget;
+  vue?: FrameworkBindingTarget;
+}
+
+export interface FrameworkBindingsMeta {
+  framework: "react" | "vue";
+  library: string;
+  generatedAt?: string;
+  productType?: string;
+  styleNotes?: string;
+}
+
+export type FrameworkBindingsFile = {
+  _meta: FrameworkBindingsMeta;
+} & Record<string, FrameworkBindingEntry | FrameworkBindingsMeta>;
+
+export interface GenerateFrameworkBindingsOptions {
+  framework: "react" | "vue";
+  library: string;
+  productType?: string;
+  styleNotes?: string;
+  dryRun?: boolean;
+}
+
+export interface GenerateFrameworkBindingsReport {
+  path: string;
+  framework: "react" | "vue";
+  library: string;
+  componentMappings: number;
+  dryRun: boolean;
 }
 
 export interface DesignComponentCard {
@@ -33,6 +81,21 @@ export interface DesignSyncOptions {
   source?: string;
   dryRun?: boolean;
   pagesOnly?: boolean;
+  incremental?: boolean;
+}
+
+export interface DesignIngestState {
+  version: 1;
+  sourceRel: string;
+  syncedAt: string;
+  files: Record<string, number>;
+}
+
+export interface ChangedSources {
+  added: string[];
+  modified: string[];
+  deleted: string[];
+  all: string[];
 }
 
 export interface DesignSyncReport {
@@ -42,6 +105,9 @@ export interface DesignSyncReport {
   tokenFiles: string[];
   warnings: string[];
   dryRun: boolean;
+  incremental?: boolean;
+  changedFiles?: string[];
+  reindexedIds?: string[];
 }
 
 export interface QueryDesignOptions {
@@ -55,6 +121,7 @@ export interface QueryDesignGlobalResult {
   profile: DesignProfile;
   style: string;
   tokens: Record<string, Record<string, string>>;
+  bindings: FrameworkBindingsFile | null;
   stale: boolean;
 }
 

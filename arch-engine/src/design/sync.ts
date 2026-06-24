@@ -17,6 +17,7 @@ import {
 import { assertDesignId } from "./ids.js";
 import type { DesignProfile, DesignSyncOptions, DesignSyncReport } from "./types.js";
 import { indexDesignKnowledge } from "./vectors.js";
+import { runIncrementalDesignSync, snapshotSourceFiles, writeIngestState } from "./incremental.js";
 
 async function writeJson(filePath: string, data: unknown, dryRun: boolean): Promise<void> {
   const text = JSON.stringify(data, null, 2);
@@ -40,6 +41,10 @@ export async function runDesignSync(
   projectRoot: string,
   options: DesignSyncOptions = {}
 ): Promise<DesignSyncReport> {
+  if (options.incremental) {
+    return runIncrementalDesignSync(projectRoot, options);
+  }
+
   const dryRun = options.dryRun ?? false;
   const pagesOnly = options.pagesOnly ?? false;
   const sourceRel = options.source ?? "designs";
@@ -131,6 +136,13 @@ export async function runDesignSync(
         await writeJson(getDesignProfilePath(projectRoot), profile, false);
       }
     }
+
+    const fileSnapshot = await snapshotSourceFiles(projectRoot, sourceRel);
+    await writeIngestState(
+      projectRoot,
+      { version: 1, sourceRel, syncedAt, files: fileSnapshot },
+      false
+    );
   }
 
   return {

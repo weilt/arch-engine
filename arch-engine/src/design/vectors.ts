@@ -236,8 +236,7 @@ export async function indexDesignKnowledge(projectRoot: string): Promise<DesignI
 }
 
 /**
- * Re-index a subset of design ids (Task 3 incremental sync will implement partial updates).
- * Id forms: component id (e.g. `Button`), page id (e.g. `list-page`), or `style`.
+ * Re-index a subset of design ids (component, page, or `style`).
  */
 export async function reindexDesignIds(
   projectRoot: string,
@@ -246,7 +245,70 @@ export async function reindexDesignIds(
   if (ids.length === 0) {
     return { indexed: 0, skipped: false };
   }
-  return indexDesignKnowledge(projectRoot);
+
+  const { config } = await loadOrInitConfig(projectRoot);
+  if (!canEmbed(config)) {
+    const warning =
+      "Design vector index skipped: missing embedding API key (set embedding.apiKey or OPENAI_API_KEY)";
+    console.warn(warning);
+    return { indexed: 0, skipped: true, warning };
+  }
+
+  const dbPath = getDesignVectorsDbPath(projectRoot);
+  try {
+    await fs.access(dbPath);
+  } catch {
+    return indexDesignKnowledge(projectRoot);
+  }
+
+  const allSpecs = await collectDesignChunks(projectRoot);
+  const specsToIndex: DesignChunkSpec[] = [];
+
+  for (const id of ids) {
+    if (id === "style") {
+      specsToIndex.push(...allSpecs.filter((s) => s.meta.path === "design/style"));
+      continue;
+    }
+    const comp = allSpecs.find((s) => s.meta.path === `design/components/${id}`);
+    if (comp) {
+      specsToIndex.push(comp);
+      continue;
+    }
+    const page = allSpecs.find((s) => s.meta.path === `design/pages/${id}`);
+    if (page) {
+      specsToIndex.push(page);
+    }
+  }
+
+  if (specsToIndex.length === 0) {
+    return { indexed: 0, skipped: false };
+  }
+
+  const store = new VectorStore(dbPath);
+  try {
+    for (const id of ids) {
+      if (id === "style") {
+        store.deleteByModule("design/style");
+      } else {
+        store.deleteByModule(`design/components/${id}`);
+        store.deleteByModule(`design/pages/${id}`);
+      }
+    }
+
+    const texts = specsToIndex.map((s) => s.text);
+    const embeddings = await embedTexts(config, texts);
+    store.upsertChunks(
+      specsToIndex.map((spec, i) => ({
+        meta: { ...spec.meta, text: spec.text },
+        embedding: embeddings[i]!,
+        sourcePath: spec.sourcePath,
+      }))
+    );
+  } finally {
+    store.close();
+  }
+
+  return { indexed: specsToIndex.length, skipped: false };
 }
 
 export async function searchDesignVectors(
