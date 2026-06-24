@@ -6,7 +6,8 @@ function printHelp(): void {
   console.log(`Usage: design-sync [projectRoot] [options]
 
 Options:
-  --source <path>    Baoyu designs folder (default: designs)
+  --adapter <name>   Ingest adapter: baoyu (default) or html
+  --source <path>    Baoyu designs folder (default: designs) or HTML file with --adapter html
   --dry-run          Report without writing .ai/design/
   --pages-only       Update pages/ and refs/ only
   --incremental      Update only changed source files (falls back to full sync without prior state)
@@ -17,6 +18,7 @@ Options:
 function parseArgs(argv: string[]): {
   projectRoot: string;
   source?: string;
+  adapter?: "baoyu" | "html";
   dryRun: boolean;
   pagesOnly: boolean;
   incremental: boolean;
@@ -26,6 +28,7 @@ function parseArgs(argv: string[]): {
   let pagesOnly = false;
   let incremental = false;
   let source: string | undefined;
+  let adapter: "baoyu" | "html" | undefined;
   const positional: string[] = [];
 
   for (let i = 0; i < args.length; i++) {
@@ -42,6 +45,14 @@ function parseArgs(argv: string[]): {
       incremental = true;
       continue;
     }
+    if (a === "--adapter") {
+      const value = args[++i];
+      if (value !== "baoyu" && value !== "html") {
+        throw new Error(`Unknown adapter: ${value}. Use baoyu or html.`);
+      }
+      adapter = value;
+      continue;
+    }
     if (a === "--source") {
       source = args[++i];
       continue;
@@ -54,12 +65,20 @@ function parseArgs(argv: string[]): {
   }
 
   const projectRoot = positional[0] ? path.resolve(positional[0]) : process.cwd();
-  return { projectRoot, source, dryRun, pagesOnly, incremental };
+  return { projectRoot, source, adapter, dryRun, pagesOnly, incremental };
 }
 
 async function main(): Promise<void> {
-  const { projectRoot, source, dryRun, pagesOnly, incremental } = parseArgs(process.argv.slice(2));
-  const report = await runDesignSync(projectRoot, { source, dryRun, pagesOnly, incremental });
+  const { projectRoot, source, adapter, dryRun, pagesOnly, incremental } = parseArgs(
+    process.argv.slice(2)
+  );
+  const report = await runDesignSync(projectRoot, {
+    source,
+    adapter,
+    dryRun,
+    pagesOnly,
+    incremental,
+  });
   console.log(JSON.stringify(report, null, 2));
   if (report.warnings.length > 0 && !dryRun) {
     process.exitCode = 0;

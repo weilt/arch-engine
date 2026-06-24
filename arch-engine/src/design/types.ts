@@ -92,6 +92,7 @@ export interface DesignPageRecipe {
 
 export interface DesignSyncOptions {
   source?: string;
+  adapter?: "baoyu" | "html";
   dryRun?: boolean;
   pagesOnly?: boolean;
   incremental?: boolean;
