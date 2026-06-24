@@ -1,0 +1,13 @@
+{
+  "id": "form-page",
+  "title": "form-page",
+  "regions": [
+    {
+      "id": "main",
+      "components": []
+    }
+  ],
+  "refPaths": [
+    "refs/form-page.html"
+  ]
+}

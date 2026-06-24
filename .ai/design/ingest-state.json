@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "sourceRel": "designs/apt-reference-ds",
+  "syncedAt": "2026-06-24T05:49:02.821Z",
+  "files": {
+    "designs/apt-reference-ds/components/Alert.prompt.md": 1782265492908.8335,
+    "designs/apt-reference-ds/components/Card.prompt.md": 1782265490074.6033,
+    "designs/apt-reference-ds/components/EmptyState.prompt.md": 1782265492316.252,
+    "designs/apt-reference-ds/components/Input.prompt.md": 1782265491253.561,
+    "designs/apt-reference-ds/components/PageHeader.prompt.md": 1782265490520.885,
+    "designs/apt-reference-ds/components/PrimaryButton.prompt.md": 1782265489846.194,
+    "designs/apt-reference-ds/components/SecondaryButton.prompt.md": 1782265489949.194,
+    "designs/apt-reference-ds/components/SkeletonList.prompt.md": 1782265492438.7014,
+    "designs/apt-reference-ds/refs/form-page.html": 1782265501544.3767,
+    "designs/apt-reference-ds/refs/list-page.html": 1782265497148.677,
+    "designs/apt-reference-ds/styles.css": 1782265481806.889,
+    "designs/apt-reference-ds/tokens.css": 1782265481004.4016,
+    "designs/apt-reference-ds/_ds_manifest.json": 1782265475474.4868,
+    "designs/apt-reference-ds/_ds_prompt.md": 1782265477449.991,
+    "designs/apt-reference-ds/_d_meta.json": 1782265484780.9932
+  }
+}

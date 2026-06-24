@@ -1,3 +1,8 @@
 {
-  "spacingMd": "16px"
+  "spacingXs": "4px",
+  "spacingSm": "8px",
+  "spacingMd": "16px",
+  "spacingLg": "24px",
+  "spacingXl": "32px",
+  "spacing2xl": "48px"
 }

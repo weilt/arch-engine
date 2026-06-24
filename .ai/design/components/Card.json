@@ -1,5 +1,6 @@
 {
   "id": "Card",
-  "promptExcerpt": "﻿# Card\r\n\r\nGrouped content surface.\r\n",
+  "role": "Grouped content surface with `--colorSurface` background and `--shadowSm`.",
+  "promptExcerpt": "# Card\n\nGrouped content surface with `--colorSurface` background and `--shadowSm`.\n\n- Padding `--spacingLg`, radius `--radiusMd`, border `--colorBorder`\n- Use for table wrappers, form sections, detail panels\n",
   "sourcePath": "components/Card.prompt.md"
 }

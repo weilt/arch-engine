@@ -1,0 +1,6 @@
+{
+  "id": "SecondaryButton",
+  "role": "Secondary action. Outline or ghost on `--colorSurface`.",
+  "promptExcerpt": "# SecondaryButton\n\nSecondary action. Outline or ghost on `--colorSurface`.\n\n- Use for cancel, back, filter toggles\n- Never compete visually with PrimaryButton on same row\n",
+  "sourcePath": "components/SecondaryButton.prompt.md"
+}

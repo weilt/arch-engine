@@ -1,0 +1,6 @@
+{
+  "id": "SkeletonList",
+  "role": "Loading placeholder for tabular or list content.",
+  "promptExcerpt": "# SkeletonList\n\nLoading placeholder for tabular or list content.\n\n- 5–8 rows of shimmer bars\n- Match table column rhythm\n- Replace with real content when data loads\n",
+  "sourcePath": "components/SkeletonList.prompt.md"
+}

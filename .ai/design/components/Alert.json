@@ -1,0 +1,6 @@
+{
+  "id": "Alert",
+  "role": "Inline status banner for info, warning, or error.",
+  "promptExcerpt": "# Alert\n\nInline status banner for info, warning, or error.\n\n- Error: `--colorError` border/background tint\n- Warning: `--colorWarning`\n- Success: `--colorSuccess`\n- Padding `--spacingMd`, radius `--radiusSm`\n",
+  "sourcePath": "components/Alert.prompt.md"
+}

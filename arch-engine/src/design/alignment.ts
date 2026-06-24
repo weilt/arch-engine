@@ -7,7 +7,13 @@ import {
   matchesDesignSystemHeuristic,
 } from "../scanners/frontend-starter.js";
 import type { FrontendPackage } from "../types.js";
-import type { FrameworkBindingsFile } from "./types.js";
+import type { FrameworkBindingEntry, FrameworkBindingsFile } from "./types.js";
+
+function isBindingEntry(value: unknown): value is FrameworkBindingEntry {
+  if (!value || typeof value !== "object") return false;
+  const v = value as FrameworkBindingEntry;
+  return Boolean(v.react || v.vue);
+}
 
 export type ArchAlignmentConfidence = "high" | "medium" | "low" | "none";
 
@@ -72,7 +78,7 @@ function collectBindingMappings(
   const mappings: BindingMapping[] = [];
 
   for (const [key, entry] of Object.entries(bindings)) {
-    if (key === "_meta") continue;
+    if (key === "_meta" || !isBindingEntry(entry)) continue;
     const target = framework === "vue" ? entry.vue : entry.react;
     if (!target?.component) continue;
     mappings.push({

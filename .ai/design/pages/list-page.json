@@ -1,0 +1,13 @@
+{
+  "id": "list-page",
+  "title": "list-page",
+  "regions": [
+    {
+      "id": "main",
+      "components": []
+    }
+  ],
+  "refPaths": [
+    "refs/list-page.html"
+  ]
+}

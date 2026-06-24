@@ -1,3 +1,13 @@
 {
-  "colorPrimary": "#3366ff"
+  "colorPrimary": "#2563eb",
+  "colorPrimaryHover": "#1d4ed8",
+  "colorSecondary": "#64748b",
+  "colorBackground": "#f8fafc",
+  "colorSurface": "#ffffff",
+  "colorBorder": "#e2e8f0",
+  "colorText": "#0f172a",
+  "colorTextMuted": "#64748b",
+  "colorSuccess": "#16a34a",
+  "colorWarning": "#d97706",
+  "colorError": "#dc2626"
 }

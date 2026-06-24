@@ -1,3 +1,11 @@
 {
-  "fontFamilyBase": "Inter, sans-serif"
+  "fontFamilyBase": "\"Inter\", system-ui, sans-serif",
+  "fontFamilyMono": "\"JetBrains Mono\", ui-monospace, monospace",
+  "fontSizeSm": "0.875rem",
+  "fontSizeMd": "1rem",
+  "fontSizeLg": "1.25rem",
+  "fontSizeXl": "1.5rem",
+  "fontWeightNormal": "400",
+  "fontWeightMedium": "500",
+  "fontWeightSemibold": "600"
 }

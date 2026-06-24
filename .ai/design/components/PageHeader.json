@@ -1,0 +1,6 @@
+{
+  "id": "PageHeader",
+  "role": "Page title block with optional breadcrumb and description.",
+  "promptExcerpt": "# PageHeader\n\nPage title block with optional breadcrumb and description.\n\n- Title: `--fontSizeXl`, `--fontWeightSemibold`\n- Subtitle: `--colorTextMuted`, `--fontSizeSm`\n- Bottom margin `--spacingLg`\n",
+  "sourcePath": "components/PageHeader.prompt.md"
+}

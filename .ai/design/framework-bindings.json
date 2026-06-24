@@ -1,0 +1,148 @@
+{
+  "_meta": {
+    "framework": "vue",
+    "library": "element-plus",
+    "generatedAt": "2026-06-24T05:49:11.861Z"
+  },
+  "PrimaryButton": {
+    "vue": {
+      "import": "element-plus",
+      "component": "ElButton",
+      "props": {
+        "type": "primary"
+      }
+    }
+  },
+  "SecondaryButton": {
+    "vue": {
+      "import": "element-plus",
+      "component": "ElButton"
+    }
+  },
+  "Card": {
+    "vue": {
+      "import": "element-plus",
+      "component": "ElCard"
+    }
+  },
+  "PageHeader": {
+    "vue": {
+      "import": "element-plus",
+      "component": "ElPageHeader",
+      "notes": "Or compose with ElBreadcrumb + title slot"
+    }
+  },
+  "Input": {
+    "vue": {
+      "import": "element-plus",
+      "component": "ElInput"
+    }
+  },
+  "Select": {
+    "vue": {
+      "import": "element-plus",
+      "component": "ElSelect"
+    }
+  },
+  "Checkbox": {
+    "vue": {
+      "import": "element-plus",
+      "component": "ElCheckbox"
+    }
+  },
+  "Radio": {
+    "vue": {
+      "import": "element-plus",
+      "component": "ElRadio"
+    }
+  },
+  "Switch": {
+    "vue": {
+      "import": "element-plus",
+      "component": "ElSwitch"
+    }
+  },
+  "Form": {
+    "vue": {
+      "import": "element-plus",
+      "component": "ElForm"
+    }
+  },
+  "Table": {
+    "vue": {
+      "import": "element-plus",
+      "component": "ElTable"
+    }
+  },
+  "Modal": {
+    "vue": {
+      "import": "element-plus",
+      "component": "ElDialog"
+    }
+  },
+  "Alert": {
+    "vue": {
+      "import": "element-plus",
+      "component": "ElAlert"
+    }
+  },
+  "EmptyState": {
+    "vue": {
+      "import": "element-plus",
+      "component": "ElEmpty"
+    }
+  },
+  "SkeletonList": {
+    "vue": {
+      "import": "element-plus",
+      "component": "ElSkeleton",
+      "props": {
+        "rows": 4,
+        "animated": true
+      }
+    }
+  },
+  "Tabs": {
+    "vue": {
+      "import": "element-plus",
+      "component": "ElTabs"
+    }
+  },
+  "Breadcrumb": {
+    "vue": {
+      "import": "element-plus",
+      "component": "ElBreadcrumb"
+    }
+  },
+  "Pagination": {
+    "vue": {
+      "import": "element-plus",
+      "component": "ElPagination"
+    }
+  },
+  "Tag": {
+    "vue": {
+      "import": "element-plus",
+      "component": "ElTag"
+    }
+  },
+  "Tooltip": {
+    "vue": {
+      "import": "element-plus",
+      "component": "ElTooltip"
+    }
+  },
+  "Dropdown": {
+    "vue": {
+      "import": "element-plus",
+      "component": "ElDropdown"
+    }
+  },
+  "Toast": {
+    "vue": {
+      "import": "element-plus",
+      "component": "ElMessage",
+      "notes": "Use ElMessage.success / .error etc."
+    }
+  }
+}

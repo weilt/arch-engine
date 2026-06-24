@@ -1,0 +1,6 @@
+{
+  "id": "Input",
+  "role": "Labeled text field for forms.",
+  "promptExcerpt": "# Input\n\nLabeled text field for forms.\n\n- Label above field, `--fontWeightMedium`\n- Border `--colorBorder`, focus ring `--colorPrimary`\n- Error state pairs with `Alert`\n",
+  "sourcePath": "components/Input.prompt.md"
+}

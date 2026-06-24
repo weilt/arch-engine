@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>list-page</title>
+  <link rel="stylesheet" href="../styles.css" />
+  <style>
+    .page { max-width: 960px; margin: 0 auto; padding: var(--spacingLg); }
+    .toolbar { display: flex; gap: var(--spacingSm); margin-bottom: var(--spacingMd); }
+    .btn-primary { background: var(--colorPrimary); color: #fff; border: none; padding: var(--spacingSm) var(--spacingMd); border-radius: var(--radiusSm); }
+    .btn-secondary { background: var(--colorSurface); border: 1px solid var(--colorBorder); padding: var(--spacingSm) var(--spacingMd); border-radius: var(--radiusSm); }
+    .card { background: var(--colorSurface); border: 1px solid var(--colorBorder); border-radius: var(--radiusMd); padding: var(--spacingLg); box-shadow: var(--shadowSm); }
+    table { width: 100%; border-collapse: collapse; font-size: var(--fontSizeSm); }
+    th, td { text-align: left; padding: var(--spacingSm); border-bottom: 1px solid var(--colorBorder); }
+    th { color: var(--colorTextMuted); font-weight: var(--fontWeightMedium); }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header class="page-header">
+      <h1 style="font-size: var(--fontSizeXl); margin: 0 0 var(--spacingSm);">Items</h1>
+      <p style="color: var(--colorTextMuted); margin: 0;">Manage records in this list.</p>
+    </header>
+    <div class="toolbar">
+      <button class="btn-primary">Create</button>
+      <button class="btn-secondary">Export</button>
+    </div>
+    <div class="card">
+      <table>
+        <thead><tr><th>Name</th><th>Status</th><th>Updated</th></tr></thead>
+        <tbody>
+          <tr><td>Alpha</td><td>Active</td><td>2026-06-01</td></tr>
+          <tr><td>Beta</td><td>Draft</td><td>2026-06-02</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</body>
+</html>

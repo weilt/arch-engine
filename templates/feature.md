@@ -21,7 +21,7 @@ model: sonnet
 2. **`query_design`**（`page: <本页 slug>`）— 读页面配方；若无，**`search_ui`** 找最接近的页面/组件模板。
 3. 列出本页需要的**语义组件**，逐个 **`query_design`**（`component: <id>`）。
 4. 若缺组件/页面定义 → **`report_design_gap`**，**停止 UI 实现**（可先写接口与纯逻辑）。
-5. 无 `framework-bindings.json` 时：用 tokens + 语义结构实现；有则优先用映射库。
+5. `query_design(scope: global)` 返回的 `bindings`：有则按 `_meta.framework` 优先用组件库映射；无则 tokens + 语义结构实现。
 
 无 `.ai/design/profile.json` 时：报告需先执行 `design-sync` 或 `/design-system`。
 

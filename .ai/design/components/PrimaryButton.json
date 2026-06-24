@@ -1,5 +1,6 @@
 {
   "id": "PrimaryButton",
-  "promptExcerpt": "﻿# PrimaryButton\r\n\r\nMain call-to-action.\r\n",
+  "role": "Main call-to-action. Solid fill using `--colorPrimary`.",
+  "promptExcerpt": "# PrimaryButton\n\nMain call-to-action. Solid fill using `--colorPrimary`.\n\n- Use for submit, save, confirm\n- One primary per view or dialog\n- Min height 36px, horizontal padding `--spacingMd`\n",
   "sourcePath": "components/PrimaryButton.prompt.md"
 }

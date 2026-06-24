@@ -1,0 +1,6 @@
+{
+  "id": "EmptyState",
+  "role": "Placeholder when a list has no items.",
+  "promptExcerpt": "# EmptyState\n\nPlaceholder when a list has no items.\n\n- Centered icon + title + short description\n- Optional `PrimaryButton` for create action\n- Use muted text `--colorTextMuted`\n",
+  "sourcePath": "components/EmptyState.prompt.md"
+}
