@@ -16,6 +16,8 @@
 | [apt-intro.pdf](docs/presentations/apt-intro/apt-intro.pdf) | PDF 版（可异步分享） |
 | [speaker-notes.md](docs/presentations/apt-intro/speaker-notes.md) | 现场口播备注（15–20 分钟） |
 
+口播稿与 [source.md](docs/presentations/apt-intro/source.md) 已与 README 同步（2026-06-24）。**pptx/pdf 幻灯片图像仍为上一版**，重生成步骤见 [宣讲维护手册](docs/presentations/_template/README.md)。
+
 维护者从 README 再生成：见 [docs/presentations/_template/README.md](docs/presentations/_template/README.md) 与 `templates/apt-deck.md`。
 
 ---
@@ -34,7 +36,7 @@ APT 用四层机制解决这些问题：
 
 | 层级 | 作用 |
 |------|------|
-| **Custom Commands** | 6 个斜杠命令；有 brainstorming spec 时 **`/plan-from-spec` → `/implement-plan`**，否则 **`/feature`**（见下方工作流） |
+| **Custom Commands** | 7 个斜杠命令；有 brainstorming spec 时 **`/plan-from-spec` → `/implement-plan`**，否则 **`/feature`**（见下方工作流） |
 | **MCP Server** | 契约 / 架构 / 设计共 **15** 个工具，代理必须调用 |
 | **架构引擎** | `start-init` 扫描代码，生成可检索的架构文档 + 向量库 |
 | **项目数据** | `.ai/db.json`、`.ai/arch/`、`.ai/design/` 存契约、架构与设计知识 |
@@ -45,14 +47,14 @@ APT 用四层机制解决这些问题：
 
 运行 `agent-init` 后，在 Claude Code / Cursor / Qoder 中可用斜杠命令，在 Codex 中可用 `apt-*` Skills；终端 CLI 与 MCP 工具在全局安装后即可使用（MCP 需在项目根执行 `agent-init` 写入 `APT_PROJECT_ROOT`）。
 
-### 斜杠命令（6）
+### 斜杠命令（7）
 
 | 命令 | 用途 |
 |------|------|
 | **`/plan-from-spec`** | **第三阶段推荐**：从 brainstorming spec 经 MCP 寻址生成双 Part 实现方案（不写代码） |
 | **`/implement-plan`** | 按已批准 plan **编排子 Agent 串行实现**（每 Task 独立上下文）并自动闭环 |
 | **`/feature`** | 无 spec 时一站式：寻址 → 计划 → **子 Agent 编排实现** → 闭环 |
-| **`/verify`** | 实现后验收门禁：对照 plan、只读 audit、契约与可检索性检查、跑测试 |
+| **`/verify`** | 实现后验收门禁：对照 plan、只读 arch/设计 audit（含 UI 时）、契约与可检索性检查、跑测试 |
 | **`/finish-feature`** | `/verify` 未通过或闭环漏跑时的写侧补救 |
 | **`/design-system`** | 立项定视觉：`design-sync` 沉淀到 `.ai/design/` |
 | **`/design-page`** | 单页原型定稿：`design-sync --pages-only`，可选 `design-bindings --check` |
@@ -183,7 +185,7 @@ design-sync --dry-run
 | 方式 | 何时用 |
 |------|--------|
 | **`/feature`**（推荐） | 寻址 → 计划 → 实现 → **自动闭环**（含 audit/refresh/remove） |
-| **`/verify`** | 实现后验收；对照 plan、只读 audit、测试（FAIL → `/finish-feature`） |
+| **`/verify`** | 实现后验收；对照 plan、只读 arch/设计 audit（含 UI 时）、测试（FAIL → `/finish-feature`） |
 | **`/finish-feature`** | **补救**：verify 未通过或漏跑闭环时手动执行 |
 | **`sync-changes`** | CLI 批量同步；`--dry-run` 仅报告，不写库 |
 | **`start-init --incremental`** | 模块级全量重扫（变更面大时） |
@@ -331,7 +333,7 @@ Windows 可用 `agent-init.cmd`、`start-init.cmd`。
 
 ### `agent-init` 做什么？
 
-- 从模板分发 6 个工作流：`.claude/commands/`、`.qoder/commands/`、`.agents/skills/apt-*/`
+- 从模板分发 7 个工作流命令：`.claude/commands/`、`.qoder/commands/`、`.agents/skills/apt-*/`
 - 幂等写入或更新 `AGENTS.md`（`<!-- apt-workflow -->` 路由片段）
 - 创建 `.ai/db.json`（空契约库）
 - 写入 `.mcp.json`、`.cursor/mcp.json`、`.codex/config.toml`，设置 `APT_PROJECT_ROOT`（含本机路径的文件建议 gitignore）
