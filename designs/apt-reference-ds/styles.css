@@ -1,0 +1,9 @@
+@import "./tokens.css";
+
+body {
+  font-family: var(--fontFamilyBase);
+  font-size: var(--fontSizeMd);
+  line-height: var(--lineHeightBase);
+  color: var(--colorText);
+  background: var(--colorBackground);
+}

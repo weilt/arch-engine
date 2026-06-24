@@ -1,0 +1,50 @@
+{
+  "type": "design-project",
+  "title": "APT Reference",
+  "designSystems": [
+    {
+      "name": "APT Reference DS",
+      "slug": "apt-ref",
+      "dsFolder": "."
+    }
+  ],
+  "primaryDesignSystem": "apt-ref",
+  "assets": {
+    "list-page": {
+      "versions": [
+        {
+          "path": "refs/list-page.html",
+          "subtitle": "Standard list / table page",
+          "viewport": { "width": 1280, "height": 800 }
+        }
+      ]
+    },
+    "form-page": {
+      "versions": [
+        {
+          "path": "refs/form-page.html",
+          "subtitle": "Create / edit form page",
+          "viewport": { "width": 1280, "height": 800 }
+        }
+      ]
+    }
+  },
+  "pageRecipes": {
+    "list-page": {
+      "regions": [
+        { "id": "header", "components": ["PageHeader"] },
+        { "id": "toolbar", "components": ["PrimaryButton", "SecondaryButton"] },
+        { "id": "content", "components": ["Card"] }
+      ],
+      "states": { "loading": "SkeletonList", "empty": "EmptyState" }
+    },
+    "form-page": {
+      "regions": [
+        { "id": "header", "components": ["PageHeader"] },
+        { "id": "form", "components": ["Card", "Input"] },
+        { "id": "actions", "components": ["PrimaryButton", "SecondaryButton"] }
+      ],
+      "states": { "error": "Alert" }
+    }
+  }
+}

@@ -1,0 +1,42 @@
+:root {
+  /* colors */
+  --colorPrimary: #2563eb;
+  --colorPrimaryHover: #1d4ed8;
+  --colorSecondary: #64748b;
+  --colorBackground: #f8fafc;
+  --colorSurface: #ffffff;
+  --colorBorder: #e2e8f0;
+  --colorText: #0f172a;
+  --colorTextMuted: #64748b;
+  --colorSuccess: #16a34a;
+  --colorWarning: #d97706;
+  --colorError: #dc2626;
+
+  /* typography */
+  --fontFamilyBase: "Inter", system-ui, sans-serif;
+  --fontFamilyMono: "JetBrains Mono", ui-monospace, monospace;
+  --fontSizeSm: 0.875rem;
+  --fontSizeMd: 1rem;
+  --fontSizeLg: 1.25rem;
+  --fontSizeXl: 1.5rem;
+  --fontWeightNormal: 400;
+  --fontWeightMedium: 500;
+  --fontWeightSemibold: 600;
+  --lineHeightBase: 1.5;
+  --lineHeightTight: 1.25;
+
+  /* spacing */
+  --spacingXs: 4px;
+  --spacingSm: 8px;
+  --spacingMd: 16px;
+  --spacingLg: 24px;
+  --spacingXl: 32px;
+  --spacing2xl: 48px;
+
+  /* radii & elevation */
+  --radiusSm: 4px;
+  --radiusMd: 8px;
+  --radiusLg: 12px;
+  --shadowSm: 0 1px 2px rgba(15, 23, 42, 0.06);
+  --shadowMd: 0 4px 12px rgba(15, 23, 42, 0.08);
+}

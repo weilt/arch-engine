@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>form-page</title>
+  <link rel="stylesheet" href="../styles.css" />
+  <style>
+    .page { max-width: 640px; margin: 0 auto; padding: var(--spacingLg); }
+    .card { background: var(--colorSurface); border: 1px solid var(--colorBorder); border-radius: var(--radiusMd); padding: var(--spacingLg); box-shadow: var(--shadowSm); margin-bottom: var(--spacingLg); }
+    label { display: block; font-weight: var(--fontWeightMedium); margin-bottom: var(--spacingXs); }
+    input { width: 100%; padding: var(--spacingSm); border: 1px solid var(--colorBorder); border-radius: var(--radiusSm); margin-bottom: var(--spacingMd); box-sizing: border-box; }
+    .actions { display: flex; gap: var(--spacingSm); }
+    .btn-primary { background: var(--colorPrimary); color: #fff; border: none; padding: var(--spacingSm) var(--spacingMd); border-radius: var(--radiusSm); }
+    .btn-secondary { background: var(--colorSurface); border: 1px solid var(--colorBorder); padding: var(--spacingSm) var(--spacingMd); border-radius: var(--radiusSm); }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header>
+      <h1 style="font-size: var(--fontSizeXl); margin: 0 0 var(--spacingSm);">Create item</h1>
+      <p style="color: var(--colorTextMuted); margin: 0;">Fill in the details below.</p>
+    </header>
+    <div class="card">
+      <label for="name">Name</label>
+      <input id="name" type="text" placeholder="Item name" />
+      <label for="desc">Description</label>
+      <input id="desc" type="text" placeholder="Optional description" />
+    </div>
+    <div class="actions">
+      <button class="btn-primary">Save</button>
+      <button class="btn-secondary">Cancel</button>
+    </div>
+  </div>
+</body>
+</html>

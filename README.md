@@ -82,13 +82,14 @@ brainstorming → docs/superpowers/specs/*-design.md
 
 **不用** superpowers `writing-plans`（不读 `.ai/` 索引）。规格见 [apt-plan-from-spec 设计](docs/superpowers/specs/2026-06-17-apt-plan-from-spec-design.md)。
 
-### 终端 CLI（4）
+### 终端 CLI（5）
 
 | 命令 | 用途 |
 |------|------|
 | **`agent-init`** | 项目初始化：多平台命令/Skills、`AGENTS.md`、`.ai/db.json`、MCP 配置（含 `.codex/config.toml`） |
 | **`start-init`** | 扫描代码生成 `.ai/arch/`（Markdown + 向量索引） |
 | **`design-sync`** | 将 `designs/` 设计真源同步到 `.ai/design/` |
+| **`design-bindings`** | 按 Vue/React 框架与 UI 库生成 `framework-bindings.json`（如 element-plus、antd） |
 | **`sync-changes`** | 架构变更批量同步（等同 MCP `sync_arch_changes`） |
 
 Windows 另有同名 `.cmd`（如 `agent-init.cmd`）。安装脚本会把 `~/.apt/bin` 加入 PATH。
@@ -119,17 +120,29 @@ Windows 另有同名 `.cmd`（如 `agent-init.cmd`）。安装脚本会把 `~/.a
 
 ### 设计知识层（Design）— 框架无关
 
-立项时用 **baoyu-design**（或其它设计工具）定风格，定稿后 **`design-sync`** 沉淀到 `.ai/design/`。开发子 agent **先查设计、再查 arch**：
+立项时用 **baoyu-design**（或其它设计工具）定风格，定稿后 **`design-sync`** 沉淀到 `.ai/design/`；选定技术栈后 **`design-bindings`** 写入框架映射。开发子 agent **先查设计、再查 arch**：
 
-- **`query_design`**：全局 tokens + `style.md`，或按 `page` / `component` 精读语义配方
+| 步骤 | CLI / MCP | 产出 |
+|------|-----------|------|
+| 定风格 | `design-sync` / `/design-system` | `.ai/design/` tokens、组件、页面配方 |
+| 定框架 | `design-bindings` | `framework-bindings.json` + profile 偏好 |
+| 开发寻址 | `query_design` / `search_ui` | 全局 tokens、bindings、页面/组件配方 |
+| 缺定义 | `report_design_gap` | 阻塞臆造 UI |
+
+- **`query_design`**：全局 tokens + `style.md` + bindings，或按 `page` / `component` 精读语义配方
 - **`search_ui`**：关键词搜索语义组件与页面模板
 - **`report_design_gap`**：缺设计定义时阻塞 UI 实现（对标 `report_missing`）
-- **`/design-system`**：引导定风格 → `design-sync`
+- **`/design-system`**：引导定风格 → `design-sync` → `design-bindings`
 - **`/feature` §0.5**：含 UI 的任务自动走设计寻址
+
+本仓库自带参考夹具 **`designs/apt-reference-ds/`**（8 语义组件、2 页面配方），狗食测试见 `arch-engine/tests/dogfood/design-workflow.test.ts`。
 
 ```powershell
 # baoyu 定稿后同步（默认读 designs/）
 design-sync --source designs/my-app
+
+# 选定 Vue + Element Plus 后生成 bindings
+design-bindings --framework vue --library element-plus
 
 # 预览
 design-sync --dry-run
