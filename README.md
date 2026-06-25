@@ -16,7 +16,7 @@
 | [apt-intro.pdf](docs/presentations/apt-intro/apt-intro.pdf) | PDF 版（可异步分享） |
 | [speaker-notes.md](docs/presentations/apt-intro/speaker-notes.md) | 现场口播备注（15–20 分钟） |
 
-口播稿与 [source.md](docs/presentations/apt-intro/source.md) 已与 README 同步（2026-06-24）。**pptx/pdf 幻灯片图像仍为上一版**，重生成步骤见 [宣讲维护手册](docs/presentations/_template/README.md)。
+口播稿与 [source.md](docs/presentations/apt-intro/source.md) 已与 README 同步（2026-06-25，含 **ZCode** 五端与 MCP 配置说明）。**pptx/pdf 幻灯片图像仍为上一版**，重生成步骤见 [宣讲维护手册](docs/presentations/_template/README.md)。
 
 维护者从 README 再生成：见 [docs/presentations/_template/README.md](docs/presentations/_template/README.md) 与 `templates/apt-deck.md`。
 
@@ -332,14 +332,25 @@ Windows 可用 `agent-init.cmd`、`start-init.cmd`。
 
 **Codex：** `agent-init` 写入 `.codex/config.toml`（gitignore，含本机路径）。会话内 `/mcp` 确认连接；使用 `apt-feature` 等 Skill 或 `/apt-feature`。
 
-**ZCode：** `agent-init` 写入 `.zcode/mcp.json`（gitignore，含本机路径）及 `.zcode/commands/`、`.zcode/skills/`。在 ZCode 中打开项目后，于 **Settings → MCP Servers** 确认 Workspace 级 `agent-protocol-mcp` 已连接（15 个工具）；使用 `/feature` 或 `$apt-feature`。ZCode 无 `zcode mcp add` CLI，`install` 不注册全局 MCP。
+**ZCode：** `agent-init` 会写入 `.zcode/commands/`、`.zcode/skills/apt-*/` 以及参考用 `.zcode/mcp.json`（gitignore）。**斜杠命令与 `$apt-*` Skill 会自动生效**；**MCP 需在 ZCode UI 中单独配置**（ZCode 未必自动加载项目根 `.zcode/mcp.json`）。
+
+1. 本机先 `install.ps1`，再在项目根 `agent-init`。
+2. 用 ZCode **打开项目根目录** → **Settings → MCP Servers** → Scope 选 **Workspace**。
+3. **Import**（从 Cursor `.cursor/mcp.json`、Claude Code 或 Codex 配置）**或**手动添加 `agent-protocol-mcp`：
+   - Command：`node`
+   - Args：`%USERPROFILE%\.apt\mcp-server\dist\index.js`（macOS/Linux：`~/.apt/mcp-server/dist/index.js`）
+   - Env：`APT_PROJECT_ROOT` = 项目根绝对路径
+4. 确认列表中 **15 个 APT 工具**已连接；使用 `/feature` 或 `$apt-feature`。
+
+> **注意：** 若能看到 7 个 `/` 命令但 MCP 列表为空，属于「半套 APT」——命令可触发，但无法 `query_contract` / `search_arch` 硬约束寻址。ZCode 无 `zcode mcp add` CLI；`install` 不注册 ZCode 全局 MCP。
 
 ### `agent-init` 做什么？
 
 - 从模板分发 7 个工作流命令：`.claude/commands/`、`.qoder/commands/`、`.zcode/commands/`、`.agents/skills/apt-*/`、`.zcode/skills/apt-*/`
 - 幂等写入或更新 `AGENTS.md`（`<!-- apt-workflow -->` 路由片段）
 - 创建 `.ai/db.json`（空契约库）
-- 写入 `.mcp.json`、`.cursor/mcp.json`、`.codex/config.toml`、`.zcode/mcp.json`，设置 `APT_PROJECT_ROOT`（含本机路径的文件建议 gitignore）
+- 写入 `.mcp.json`、`.cursor/mcp.json`、`.codex/config.toml`、`.zcode/mcp.json`（后两者 gitignore），设置 `APT_PROJECT_ROOT`
+- **ZCode 用户：** 命令/Skill 注入后即可用；MCP 仍以 ZCode **Settings → MCP Servers** 中是否出现 `agent-protocol-mcp` 为准（见上方 ZCode 快速开始）
 
 ### `start-init` 做什么？
 
@@ -637,6 +648,29 @@ claude mcp list   # 应显示 ✓ Connected
 ### Cursor 里 `/finish-feature` 提示「MCP contract registration is not available」？
 
 说明当前会话未加载 APT MCP。安装后执行 `.\scripts\merge-mcp-config.ps1`（或 `install.ps1`），在 `%USERPROFILE%\.cursor\mcp.json` 中应出现 `agent-protocol-mcp`，**重启 Cursor**，并在 MCP 列表中确认有 `register_contract` / `register_asset` 等工具。
+
+### ZCode 里能看到 `/` 命令，但 MCP 列表没有 `agent-protocol-mcp`？
+
+常见情况：`.zcode/commands/` 已注入（7 个命令可见），但 MCP 未在 Settings 中配置。
+
+1. 确认 `%USERPROFILE%\.apt\mcp-server\dist\index.js`（或 `~/.apt/...`）存在；若无，在 APT 仓库根执行 `.\scripts\install.ps1`。
+2. 在项目根再执行 `agent-init`（生成参考用 `.zcode/mcp.json`）。
+3. ZCode **Settings → MCP Servers** → Workspace → **Import**（从 Cursor/Claude/Codex）或 **Full configuration** 粘贴：
+
+```json
+{
+  "mcpServers": {
+    "agent-protocol-mcp": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["C:/Users/<you>/.apt/mcp-server/dist/index.js"],
+      "env": { "APT_PROJECT_ROOT": "C:/path/to/your/project" }
+    }
+  }
+}
+```
+
+4. 新开 ZCode 任务，确认 15 个工具可用。仅有命令无 MCP 时，代理无法执行契约/架构硬约束。
 
 ### Cursor 里出现两个 `agent-protocol-mcp`？
 

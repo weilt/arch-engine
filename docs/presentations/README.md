@@ -9,7 +9,7 @@
 - **speaker-notes.md** — 15–20 分钟口播稿
 - **source.md** — 宣讲叙事真源（与 README 对齐）
 
-口播稿与 `source.md` 已与 README 同步（2026-06-24）。**pptx/pdf 幻灯片图像仍为上一版**，重生成步骤见 [_template/README.md](_template/README.md)。
+口播稿与 `source.md` 已与 README 同步（2026-06-25），含 **五端平台**（Claude Code、Cursor、Qoder、Codex、**ZCode**）及 ZCode MCP 需在 Settings 配置的说明。**pptx/pdf 幻灯片图像仍为上一版**（Slide 9 等平台数可能仍为旧图），重生成步骤见 [_template/README.md](_template/README.md)。
 
 ## 维护者
 

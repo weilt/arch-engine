@@ -71,7 +71,9 @@ APT 是全局安装、按项目激活的工具集。四层机制：
 
 ## Slide 9 — 多平台（~1 min）
 
-一套 MCP，四个平台：Claude Code、Cursor、Qoder、Codex。`agent-init` 把命令/Skills 和项目 MCP 配置写到各平台路径。团队 IDE 不统一也能同一套规矩。
+一套 MCP，**五个**平台：Claude Code、Cursor、Qoder、Codex、**ZCode**。`agent-init` 把命令/Skills 写到各平台路径；MCP 含 `APT_PROJECT_ROOT`。
+
+ZCode 补充：`/` 命令与 `$apt-*` Skill 打开项目即见；**MCP 要在 Settings 里 Import 或手动配**——有命令无 MCP 无法硬约束寻址。幻灯片图像若仍画四节点，以本口播为准（下轮重生成 pptx）。
 
 ---
 

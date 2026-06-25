@@ -132,18 +132,18 @@ Style Rules:
 One MCP, multiple IDEs — reduce adoption friction.
 
 ### Key Content
-Headline: 一套 MCP，四个平台
+Headline: 一套 MCP，五个平台
 Body:
 - Claude Code / Cursor
-- Qoder / Codex
+- Qoder / Codex / ZCode
 - agent-init 项目激活
 
 ### Visual
-Central MCP hub node with four platform nodes connected by straight lines. Blueprint hub-spoke diagram.
+Central MCP hub node with five platform nodes connected by straight lines. Blueprint hub-spoke diagram.
 
 ### Layout
 Layout: hub-spoke
-Central hub, four spokes.
+Central hub, five spokes.
 
 **Aspect Ratio**: 16:9 landscape presentation slide.
 **Language**: All text in Simplified Chinese.

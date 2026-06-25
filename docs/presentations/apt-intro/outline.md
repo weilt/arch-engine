@@ -246,18 +246,18 @@ Layout: card-grid
 One MCP, multiple IDEs — reduce adoption friction.
 
 // KEY CONTENT
-Headline: 一套 MCP，四个平台
+Headline: 一套 MCP，五个平台
 Body:
 - Claude Code / Cursor
-- Qoder / Codex
+- Qoder / Codex / ZCode
 - agent-init 项目激活
 
 // VISUAL
-Central MCP hub node with four platform nodes connected by straight lines. Blueprint hub-spoke diagram.
+Central MCP hub node with five platform nodes connected by straight lines. Blueprint hub-spoke diagram.
 
 // LAYOUT
 Layout: hub-spoke
-Central hub, four spokes.
+Central hub, five spokes.
 
 ---
 
