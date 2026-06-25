@@ -24,7 +24,7 @@
 
 ## 这是什么？
 
-APT（Agent-Protocol-Toolkit）是一套**全局安装、按项目激活**的开发工具集，面向 **Claude Code**、**Cursor**、**Qoder**、**Codex** 与 **MCP（Model Context Protocol）**。
+APT（Agent-Protocol-Toolkit）是一套**全局安装、按项目激活**的开发工具集，面向 **Claude Code**、**Cursor**、**Qoder**、**Codex**、**ZCode** 与 **MCP（Model Context Protocol）**。
 
 大模型在长任务里常见问题：
 
@@ -45,7 +45,7 @@ APT 用四层机制解决这些问题：
 
 ## 命令与工具一览
 
-运行 `agent-init` 后，在 Claude Code / Cursor / Qoder 中可用斜杠命令，在 Codex 中可用 `apt-*` Skills；终端 CLI 与 MCP 工具在全局安装后即可使用（MCP 需在项目根执行 `agent-init` 写入 `APT_PROJECT_ROOT`）。
+运行 `agent-init` 后，在 Claude Code / Cursor / Qoder / ZCode 中可用斜杠命令，在 Codex / ZCode 中亦可用 `apt-*` Skills（`$apt-feature` 等）；终端 CLI 与 MCP 工具在全局安装后即可使用（MCP 需在项目根执行 `agent-init` 写入 `APT_PROJECT_ROOT`）。
 
 ### 斜杠命令（7）
 
@@ -67,6 +67,7 @@ APT 用四层机制解决这些问题：
 |------|------|
 | Claude Code / Cursor | `.claude/commands/` |
 | Qoder | `.qoder/commands/` |
+| ZCode | `.zcode/commands/`（斜杠命令）、`.zcode/skills/apt-*/`（`$apt-*` Skill） |
 | Codex | `.agents/skills/apt-*/SKILL.md` |
 
 ### 第三阶段工作流（有 brainstorming spec 时）
@@ -89,7 +90,7 @@ brainstorming → docs/superpowers/specs/*-design.md
 
 | 命令 | 用途 |
 |------|------|
-| **`agent-init`** | 项目初始化：多平台命令/Skills、`AGENTS.md`、`.ai/db.json`、MCP 配置（含 `.codex/config.toml`） |
+| **`agent-init`** | 项目初始化：多平台命令/Skills、`AGENTS.md`、`.ai/db.json`、MCP 配置（含 `.codex/config.toml`、`.zcode/mcp.json`） |
 | **`start-init`** | 扫描代码生成 `.ai/arch/`（Markdown + 向量索引） |
 | **`design-sync`** | 将设计真源同步到 `.ai/design/`（`--adapter baoyu`/`html`/`figma`，`--incremental`） |
 | **`design-bindings`** | 按 Vue/React 框架与 UI 库生成 `framework-bindings.json`（如 element-plus、antd） |
@@ -252,9 +253,9 @@ flowchart TB
 ## 环境要求
 
 - **Node.js 18+**
-- **Claude Code**、**Cursor**、**Qoder** 和/或 **Codex CLI**（均需支持 MCP）
+- **Claude Code**、**Cursor**、**Qoder**、**ZCode** 和/或 **Codex CLI**（均需支持 MCP）
 - Claude Code 用户需安装 **Claude CLI**（`claude mcp` 注册全局 MCP）
-- Qoder / Codex 用户需安装对应 CLI（`install.ps1` 会尝试 `qoder mcp add` / `codex mcp add`）
+- Qoder / Codex 用户需安装对应 CLI（`install.ps1` 会尝试 `qoder mcp add` / `codex mcp add`）；**ZCode 无全局 MCP CLI**，仅依赖项目级 `.zcode/mcp.json`
 - **架构扫描**需要 OpenAI 兼容的 Embedding / Chat API（见下方配置）
   - 已验证：阿里 DashScope、讯飞 MaaS 等兼容网关
 
@@ -331,12 +332,14 @@ Windows 可用 `agent-init.cmd`、`start-init.cmd`。
 
 **Codex：** `agent-init` 写入 `.codex/config.toml`（gitignore，含本机路径）。会话内 `/mcp` 确认连接；使用 `apt-feature` 等 Skill 或 `/apt-feature`。
 
+**ZCode：** `agent-init` 写入 `.zcode/mcp.json`（gitignore，含本机路径）及 `.zcode/commands/`、`.zcode/skills/`。在 ZCode 中打开项目后，于 **Settings → MCP Servers** 确认 Workspace 级 `agent-protocol-mcp` 已连接（15 个工具）；使用 `/feature` 或 `$apt-feature`。ZCode 无 `zcode mcp add` CLI，`install` 不注册全局 MCP。
+
 ### `agent-init` 做什么？
 
-- 从模板分发 7 个工作流命令：`.claude/commands/`、`.qoder/commands/`、`.agents/skills/apt-*/`
+- 从模板分发 7 个工作流命令：`.claude/commands/`、`.qoder/commands/`、`.zcode/commands/`、`.agents/skills/apt-*/`、`.zcode/skills/apt-*/`
 - 幂等写入或更新 `AGENTS.md`（`<!-- apt-workflow -->` 路由片段）
 - 创建 `.ai/db.json`（空契约库）
-- 写入 `.mcp.json`、`.cursor/mcp.json`、`.codex/config.toml`，设置 `APT_PROJECT_ROOT`（含本机路径的文件建议 gitignore）
+- 写入 `.mcp.json`、`.cursor/mcp.json`、`.codex/config.toml`、`.zcode/mcp.json`，设置 `APT_PROJECT_ROOT`（含本机路径的文件建议 gitignore）
 
 ### `start-init` 做什么？
 

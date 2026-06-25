@@ -17,6 +17,7 @@ $inject = Join-Path $aptHome "scripts\inject-platform-assets.cjs"
 $mcpEntry = Join-Path $aptHome "mcp-server\dist\index.js"
 $writeMcp = Join-Path $aptHome "scripts\write-project-mcp-json.cjs"
 $writeCodex = Join-Path $aptHome "scripts\write-codex-config.cjs"
+$writeZcode = Join-Path $aptHome "scripts\write-zcode-config.cjs"
 
 if (Test-Path $inject) {
   node $inject $target $aptHome
@@ -34,4 +35,8 @@ if ((Test-Path $mcpEntry) -and (Test-Path $writeCodex)) {
   node $writeCodex $target $mcpEntry
 }
 
-Write-Host "✅ Agent Protocol Toolkit initialized (Claude, Cursor, Qoder, Codex)."
+if ((Test-Path $mcpEntry) -and (Test-Path $writeZcode)) {
+  node $writeZcode $target $mcpEntry
+}
+
+Write-Host "✅ Agent Protocol Toolkit initialized (Claude, Cursor, Qoder, Codex, ZCode)."

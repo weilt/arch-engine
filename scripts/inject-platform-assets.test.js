@@ -88,7 +88,7 @@ describe("injectPlatformAssets integration", () => {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 
-  it("writes claude, qoder, and codex skill outputs", () => {
+  it("writes claude, qoder, zcode, and codex skill outputs", () => {
     const projectRoot = path.join(tmpDir, "project");
     fs.mkdirSync(projectRoot);
 
@@ -100,11 +100,23 @@ describe("injectPlatformAssets integration", () => {
     );
     assert.doesNotMatch(qoder, /model:/);
 
+    const zcodeCmd = fs.readFileSync(
+      path.join(projectRoot, ".zcode", "commands", "feature.md"),
+      "utf8"
+    );
+    assert.doesNotMatch(zcodeCmd, /model:/);
+
     const skill = fs.readFileSync(
       path.join(projectRoot, ".agents", "skills", "apt-feature", "SKILL.md"),
       "utf8"
     );
     assert.match(skill, /name: apt-feature/);
+
+    const zcodeSkill = fs.readFileSync(
+      path.join(projectRoot, ".zcode", "skills", "apt-feature", "SKILL.md"),
+      "utf8"
+    );
+    assert.match(zcodeSkill, /name: apt-feature/);
 
     assert.equal(
       fs.readdirSync(path.join(projectRoot, ".claude", "commands")).length,
@@ -112,6 +124,18 @@ describe("injectPlatformAssets integration", () => {
     );
     assert.equal(
       fs.readdirSync(path.join(projectRoot, ".qoder", "commands")).length,
+      7
+    );
+    assert.equal(
+      fs.readdirSync(path.join(projectRoot, ".zcode", "commands")).length,
+      7
+    );
+    assert.equal(
+      fs.readdirSync(path.join(projectRoot, ".agents", "skills")).length,
+      7
+    );
+    assert.equal(
+      fs.readdirSync(path.join(projectRoot, ".zcode", "skills")).length,
       7
     );
     assert(!fs.existsSync(path.join(projectRoot, ".claude", "commands", "_feature-closeout.md")));

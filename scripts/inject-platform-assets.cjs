@@ -118,11 +118,15 @@ function injectPlatformAssets(projectRoot, aptHome) {
 
   const claudeDir = path.join(root, ".claude", "commands");
   const qoderDir = path.join(root, ".qoder", "commands");
+  const zcodeCommandsDir = path.join(root, ".zcode", "commands");
   const skillsRoot = path.join(root, ".agents", "skills");
+  const zcodeSkillsRoot = path.join(root, ".zcode", "skills");
 
   fs.mkdirSync(claudeDir, { recursive: true });
   fs.mkdirSync(qoderDir, { recursive: true });
+  fs.mkdirSync(zcodeCommandsDir, { recursive: true });
   fs.mkdirSync(skillsRoot, { recursive: true });
+  fs.mkdirSync(zcodeSkillsRoot, { recursive: true });
 
   for (const filename of fs.readdirSync(templatesDir)) {
     if (!PUBLIC_TEMPLATES.has(filename)) {
@@ -132,6 +136,7 @@ function injectPlatformAssets(projectRoot, aptHome) {
 
     fs.writeFileSync(path.join(claudeDir, filename), buildClaudeCommand(content));
     fs.writeFileSync(path.join(qoderDir, filename), buildQoderCommand(content));
+    fs.writeFileSync(path.join(zcodeCommandsDir, filename), buildQoderCommand(content));
 
     const skillDir = path.join(skillsRoot, skillNameFromFile(filename));
     fs.mkdirSync(skillDir, { recursive: true });
@@ -139,11 +144,20 @@ function injectPlatformAssets(projectRoot, aptHome) {
       path.join(skillDir, "SKILL.md"),
       buildCodexSkill(filename, content)
     );
+
+    const zcodeSkillDir = path.join(zcodeSkillsRoot, skillNameFromFile(filename));
+    fs.mkdirSync(zcodeSkillDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(zcodeSkillDir, "SKILL.md"),
+      buildCodexSkill(filename, content)
+    );
   }
 
   console.log("OK " + claudeDir);
   console.log("OK " + qoderDir);
+  console.log("OK " + zcodeCommandsDir);
   console.log("OK " + skillsRoot);
+  console.log("OK " + zcodeSkillsRoot);
 
   if (fs.existsSync(snippetPath)) {
     injectAgentsMd(root, snippetPath);

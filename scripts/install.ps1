@@ -71,6 +71,7 @@ Copy-Item -Path (Join-Path $RepoRoot "scripts\merge-mcp-config.cjs") -Destinatio
 Copy-Item -Path (Join-Path $RepoRoot "scripts\write-project-mcp-json.cjs") -Destination $scriptsTarget -Force
 Copy-Item -Path (Join-Path $RepoRoot "scripts\inject-platform-assets.cjs") -Destination $scriptsTarget -Force
 Copy-Item -Path (Join-Path $RepoRoot "scripts\write-codex-config.cjs") -Destination $scriptsTarget -Force
+Copy-Item -Path (Join-Path $RepoRoot "scripts\write-zcode-config.cjs") -Destination $scriptsTarget -Force
 Copy-Item -Path (Join-Path $RepoRoot "README.md") -Destination $AptHome -Force
 
 Write-Host "Registering MCP globally (Claude Code, Cursor, Qoder, Codex)..."

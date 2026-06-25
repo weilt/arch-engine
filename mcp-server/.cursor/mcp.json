@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "agent-protocol-mcp": {
+      "command": "node",
+      "args": [
+        "C:\\Users\\ASUS\\.apt\\mcp-server\\dist\\index.js"
+      ],
+      "env": {
+        "APT_PROJECT_ROOT": "F:\\software\\claude_plugin\\mcp-server"
+      }
+    }
+  }
+}

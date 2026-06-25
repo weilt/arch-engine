@@ -1,0 +1,7 @@
+[mcp_servers.agent-protocol-mcp]
+command = "node"
+args = ["C:/Users/ASUS/.apt/mcp-server/dist/index.js"]
+enabled = true
+
+[mcp_servers.agent-protocol-mcp.env]
+APT_PROJECT_ROOT = "F:/software/claude_plugin/mcp-server"

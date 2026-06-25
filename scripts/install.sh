@@ -32,6 +32,7 @@ cp "$REPO_ROOT/scripts/merge-mcp-config.cjs" \
   "$REPO_ROOT/scripts/write-project-mcp-json.cjs" \
   "$REPO_ROOT/scripts/inject-platform-assets.cjs" \
   "$REPO_ROOT/scripts/write-codex-config.cjs" \
+  "$REPO_ROOT/scripts/write-zcode-config.cjs" \
   "$SCRIPTS_DIR/"
 cp "$REPO_ROOT/README.md" "$APT_HOME/"
 chmod +x "$APT_HOME/bin/"*.sh

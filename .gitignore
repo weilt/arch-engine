@@ -16,6 +16,7 @@ dist/
 .mcp.json
 .cursor/mcp.json
 .codex/config.toml
+.zcode/mcp.json
 .ai/arch/
 
 # APT 子 Agent 编排运行时账本（业务项目本地）

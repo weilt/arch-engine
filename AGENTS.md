@@ -9,9 +9,9 @@
 
 ### 命令 / Skill 对照
 
-| 场景 | Claude / Cursor / Qoder | Codex |
-|------|-------------------------|-------|
-| 一站式功能开发 | `/feature` | `apt-feature` |
+| 场景 | Claude / Cursor / Qoder / ZCode | Codex |
+|------|----------------------------------|-------|
+| 一站式功能开发 | `/feature` | `apt-feature`（ZCode 亦可用 `$apt-feature`） |
 | Spec → 方案 | `/plan-from-spec` | `apt-plan-from-spec` |
 | 按方案实现 | `/implement-plan` | `apt-implement-plan` |
 | 实现后验收 | `/verify` | `apt-verify` |
@@ -46,6 +46,7 @@
 
 终端：`start-init`（架构）、`design-sync`（设计）、`sync-changes`（批量架构同步）。
 <!-- apt-workflow:end -->
+
 
 
 

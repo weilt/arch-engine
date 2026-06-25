@@ -15,6 +15,7 @@ INJECT="$APT_HOME/scripts/inject-platform-assets.cjs"
 MCP_ENTRY="$APT_HOME/mcp-server/dist/index.js"
 WRITE_MCP="$APT_HOME/scripts/write-project-mcp-json.cjs"
 WRITE_CODEX="$APT_HOME/scripts/write-codex-config.cjs"
+WRITE_ZCODE="$APT_HOME/scripts/write-zcode-config.cjs"
 
 if [ -f "$INJECT" ]; then
   node "$INJECT" "$TARGET" "$APT_HOME"
@@ -38,4 +39,8 @@ if [ -f "$MCP_ENTRY" ] && [ -f "$WRITE_CODEX" ]; then
   node "$WRITE_CODEX" "$TARGET" "$MCP_ENTRY"
 fi
 
-echo "✅ Agent Protocol Toolkit initialized (Claude, Cursor, Qoder, Codex)."
+if [ -f "$MCP_ENTRY" ] && [ -f "$WRITE_ZCODE" ]; then
+  node "$WRITE_ZCODE" "$TARGET" "$MCP_ENTRY"
+fi
+
+echo "✅ Agent Protocol Toolkit initialized (Claude, Cursor, Qoder, Codex, ZCode)."
