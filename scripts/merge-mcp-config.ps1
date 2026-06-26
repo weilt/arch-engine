@@ -1,6 +1,22 @@
 # Register agent-protocol-mcp globally (all projects). Per-project .mcp.json is written by agent-init.
 $ErrorActionPreference = "Stop"
 
+function Invoke-McpRemoveQuiet {
+  param(
+    [string]$Cli,
+    [string[]]$Args
+  )
+  # Native CLIs write "not found" to stderr; with $ErrorActionPreference=Stop that aborts install.
+  $prevEap = $ErrorActionPreference
+  $ErrorActionPreference = "Continue"
+  try {
+    & $Cli @Args 2>&1 | Out-Null
+    return $LASTEXITCODE
+  } finally {
+    $ErrorActionPreference = $prevEap
+  }
+}
+
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $AptHome = if ($env:APT_HOME) { $env:APT_HOME } else { Join-Path $env:USERPROFILE ".apt" }
 $McpEntry = Join-Path $AptHome "mcp-server\dist\index.js"
@@ -22,8 +38,7 @@ Write-Host "OK Cursor -> $cursorMcp"
 # Claude Code: ~/.claude.json user scope (NOT ~/.claude/settings.json — silently ignored)
 $claudeCli = Get-Command claude -ErrorAction SilentlyContinue
 if ($claudeCli) {
-  & claude mcp remove agent-protocol-mcp -s user 2>&1 | Out-Null
-  $removeExit = $LASTEXITCODE
+  $removeExit = Invoke-McpRemoveQuiet claude @("mcp", "remove", "agent-protocol-mcp", "-s", "user")
   if ($removeExit -ne 0 -and $removeExit -ne 1) {
     Write-Warning "claude mcp remove returned $removeExit (ignored if server was not registered)"
   }
@@ -40,8 +55,7 @@ if ($claudeCli) {
 # Qoder CLI: user scope
 $qoderCli = Get-Command qoder -ErrorAction SilentlyContinue
 if ($qoderCli) {
-  & qoder mcp remove agent-protocol-mcp -s user 2>&1 | Out-Null
-  $qoderRemoveExit = $LASTEXITCODE
+  $qoderRemoveExit = Invoke-McpRemoveQuiet qoder @("mcp", "remove", "agent-protocol-mcp", "-s", "user")
   if ($qoderRemoveExit -ne 0 -and $qoderRemoveExit -ne 1) {
     Write-Warning "qoder mcp remove returned $qoderRemoveExit (ignored if server was not registered)"
   }
@@ -60,8 +74,7 @@ if ($qoderCli) {
 # Codex CLI: global config
 $codexCli = Get-Command codex -ErrorAction SilentlyContinue
 if ($codexCli) {
-  & codex mcp remove agent-protocol-mcp 2>&1 | Out-Null
-  $codexRemoveExit = $LASTEXITCODE
+  $codexRemoveExit = Invoke-McpRemoveQuiet codex @("mcp", "remove", "agent-protocol-mcp")
   if ($codexRemoveExit -ne 0 -and $codexRemoveExit -ne 1) {
     Write-Warning "codex mcp remove returned $codexRemoveExit (ignored if server was not registered)"
   }
