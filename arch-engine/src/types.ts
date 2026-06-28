@@ -211,7 +211,9 @@ export interface ArchConfig {
     summarizeJsonMode?: boolean;
   };
   apiSpecGlobs: string[];
-  /** Optional glob patterns for design-system / UI base packages (e.g. "@star/ui"). */
-  designSystemPackages?: string[];
-  scanners: { java: boolean; frontend: boolean };
+ /** Optional glob patterns for design-system / UI base packages (e.g. "@star/ui"). */
+ designSystemPackages?: string[];
+  /** Optional glob patterns for frontend app packages not at the JS repo root (e.g. "web", "admin-ui"). */
+  frontendPackages?: string[];
+ scanners: { java: boolean; frontend: boolean };
 }
