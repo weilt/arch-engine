@@ -5,6 +5,7 @@ import { parse as parseYaml } from "yaml";
 import type {
   FrontendEnum,
   ApiClientContract,
+  RouteEntry,
   FrontendPackage,
   FrontendSymbol,
   RawCandidate,
@@ -13,6 +14,7 @@ import { discoverExports } from "./ts-export.js";
 import { extractFromSource, extractVueScript } from "./ts-doc.js";
 import { archLog } from "../log.js";
 import { extractApiClients, isApiClientFile } from "./frontend-api.js";
+import { extractRoutes, isRouterFile } from "./frontend-router.js";
 
 interface PackageJson {
   name?: string;
@@ -197,8 +199,9 @@ async function scanPackageDir(
  const components: FrontendSymbol[] = [];
  const utils: FrontendSymbol[] = [];
  const enums: FrontendEnum[] = [];
-  const apiClients: ApiClientContract[] = [];
- const seenComponentFiles = new Set<string>();
+ const apiClients: ApiClientContract[] = [];
+ const routes: RouteEntry[] = [];
+const seenComponentFiles = new Set<string>();
   const seenUtilFiles = new Set<string>();
   const seenEnumKeys = new Set<string>();
 
@@ -230,7 +233,11 @@ async function scanPackageDir(
      }
 
       if (isApiClientFile(content)) {
-        apiClients.push(...extractApiClients(content, relativeFile));
+       apiClients.push(...extractApiClients(content, relativeFile));
+     }
+
+      if (isRouterFile(content)) {
+        routes.push(...extractRoutes(content));
       }
  
       if (discovered.length === 0 && doc.enums.length > 0) {
@@ -254,7 +261,8 @@ async function scanPackageDir(
   components.sort((a, b) => a.name.localeCompare(b.name));
   utils.sort((a, b) => a.name.localeCompare(b.name));
   enums.sort((a, b) => a.name.localeCompare(b.name));
-  apiClients.sort((a, b) => a.name.localeCompare(b.name));
+ apiClients.sort((a, b) => a.name.localeCompare(b.name));
+ routes.sort((a, b) => a.path.localeCompare(b.path));
 
   return {
     slug: moduleSlug,
@@ -262,10 +270,11 @@ async function scanPackageDir(
     description: pkg.description ?? "",
     framework: inferFramework(pkg),
     components,
-    utils,
-    enums,
-    apiClients,
-  };
+   utils,
+   enums,
+   apiClients,
+   routes,
+};
 }
 
 function workspacePackageJsonGlobs(patterns: string[]): string[] {
