@@ -17,6 +17,7 @@ import { handleSearchUi } from "./design-search.js";
 import { handleReportDesignGap } from "./design-gap.js";
 import { handleRegisterUiPattern } from "./design-register.js";
 import { handleAuditDesignChanges } from "./design-audit.js";
+import { handleQueryProjectStatus } from "./status/aggregate.js";
 
 const projectRoot = getProjectRoot();
 
@@ -495,6 +496,25 @@ server.tool(
     } catch (err) {
       return {
         content: [{ type: "text" as const, text: String(err) }],
+        isError: true,
+      };
+    }
+  }
+);
+
+server.tool(
+  "query_project_status",
+  "Aggregate APT autonomous-loop status: phase, loopDone, nextAction (read-only)",
+  {},
+  async () => {
+    try {
+      const r = await handleQueryProjectStatus(projectRoot);
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify(r, null, 2) }],
+      };
+    } catch (err) {
+      return {
+        content: [{ type: "text" as const, text: "Error: " + String(err) }],
         isError: true,
       };
     }

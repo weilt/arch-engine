@@ -4,7 +4,8 @@
   "type": "module",
   "main": "dist/index.js",
   "bin": {
-    "agent-protocol-mcp": "dist/index.js"
+    "agent-protocol-mcp": "dist/index.js",
+    "apt-status": "dist/cli-status.js"
   },
   "scripts": {
     "build": "tsc",
