@@ -25,6 +25,12 @@ export interface FrontendSymbol {
   file: string;
   description: string;
   exports: string[];
+  /** Component template tags (PascalCase / library-prefixed) from a .vue SFC. */
+  related?: string[];
+  /** Component prop names extracted from a .vue SFC contract. */
+  props?: string[];
+  /** Component emit names extracted from a .vue SFC contract. */
+  emits?: string[];
 }
 
 export interface FrontendEnum {

@@ -17,6 +17,7 @@ import { archLog } from "../log.js";
 import { extractApiClients, isApiClientFile } from "./frontend-api.js";
 import { extractRoutes, isRouterFile } from "./frontend-router.js";
 import { extractStores, isStoreFile } from "./frontend-store.js";
+import { extractVueContract } from "./frontend-vue-contract.js";
 
 interface PackageJson {
   name?: string;
@@ -217,7 +218,25 @@ const seenComponentFiles = new Set<string>();
       const hints = fileKindHints(discovered);
 
       if (hints.has("component") && !seenComponentFiles.has(relativeFile)) {
-        components.push(buildFrontendSymbol(relativeFile, doc));
+        const sym = buildFrontendSymbol(relativeFile, doc);
+        // For .vue SFCs, enrich the component with the structured contract
+        // (props/emits/templateTags) extracted from the RAW SFC text. The loop
+        // variable `content` is the script-stripped text, so we re-read the raw
+        // file here; extractVueContract needs the full SFC (template + script).
+        if (relativeFile.toLowerCase().endsWith(".vue")) {
+          try {
+            const rawSfc = await fs.readFile(path.join(pkgDir, relativeFile), "utf-8");
+            const vc = extractVueContract(rawSfc);
+            if (vc) {
+              if (vc.templateTags.length > 0) sym.related = vc.templateTags;
+              if (vc.props.length > 0) sym.props = vc.props;
+              if (vc.emits.length > 0) sym.emits = vc.emits;
+            }
+          } catch {
+            // raw SFC unreadable: leave the symbol registered but unenriched
+          }
+        }
+        components.push(sym);
         seenComponentFiles.add(relativeFile);
       }
 

@@ -51,6 +51,9 @@ const fixtureModel: DocumentModel = {
           file: "src/components/Button.tsx",
           description: "Primary button",
           exports: ["export function Button()"],
+          related: ["el-card"],
+          props: ["title"],
+          emits: ["close"],
         },
       ],
       utils: [
@@ -67,6 +70,29 @@ const fixtureModel: DocumentModel = {
           file: "src/enums/UserRole.ts",
           description: "User roles",
           members: ["Admin", "User"],
+        },
+      ],
+      apiClients: [
+        {
+          name: "userApi",
+          file: "src/api/user.ts",
+          description: "",
+          endpoints: [
+            { method: "GET", path: "/users" },
+            { method: "POST", path: "/users" },
+          ],
+        },
+      ],
+      routes: [{ path: "/users", name: "users", component: "UserList" }],
+      stores: [
+        {
+          name: "user",
+          storeId: "user",
+          file: "src/stores/user.ts",
+          description: "",
+          state: ["count"],
+          getters: ["double"],
+          actions: ["increment"],
         },
       ],
     },
@@ -100,6 +126,18 @@ describe("writeMarkdownTree", () => {
     );
     const utilsMd = await fs.readFile(path.join(archDir, "frontend", "ui", "utils.md"), "utf-8");
     const enumsMd = await fs.readFile(path.join(archDir, "frontend", "ui", "enums.md"), "utf-8");
+    const apiClientsMd = await fs.readFile(
+      path.join(archDir, "frontend", "ui", "api-clients.md"),
+      "utf-8"
+    );
+    const routesMd = await fs.readFile(
+      path.join(archDir, "frontend", "ui", "routes.md"),
+      "utf-8"
+    );
+    const storesMd = await fs.readFile(
+      path.join(archDir, "frontend", "ui", "stores.md"),
+      "utf-8"
+    );
 
     expect(apiMd).toContain("## POST /auth/login");
     expect(apiMd).toContain("## GET /auth/me");
@@ -109,9 +147,24 @@ describe("writeMarkdownTree", () => {
     expect(componentsMd).toContain("## Button");
     expect(componentsMd).toContain("Primary button");
     expect(componentsMd).toContain("export function Button()");
+    expect(componentsMd).toContain("el-card");
+    expect(componentsMd).toContain("`title`");
+    expect(componentsMd).toContain("`close`");
     expect(utilsMd).toContain("## formatDate");
     expect(utilsMd).toContain("Format dates");
     expect(enumsMd).toContain("## UserRole");
     expect(enumsMd).toContain("Members: Admin, User");
+    expect(apiClientsMd).toContain("# API Clients");
+    expect(apiClientsMd).toContain("## userApi");
+    expect(apiClientsMd).toContain("src/api/user.ts");
+    expect(apiClientsMd).toContain("`GET /users`");
+    expect(apiClientsMd).toContain("`POST /users`");
+    expect(routesMd).toContain("# Routes");
+    expect(routesMd).toContain("## /users");
+    expect(routesMd).toContain("`UserList`");
+    expect(storesMd).toContain("# Stores");
+    expect(storesMd).toContain("## user");
+    expect(storesMd).toContain("src/stores/user.ts");
+    expect(storesMd).toContain("`increment`");
   });
 });
