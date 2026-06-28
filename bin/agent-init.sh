@@ -11,6 +11,25 @@ if [ ! -f "$DB" ]; then
   echo '{"contracts":[],"missingRequests":[]}' > "$DB"
 fi
 
+mkdir -p "$TARGET/.apt"
+mkdir -p "$TARGET/.apt/verify"
+
+STATUS="$TARGET/.apt/status.json"
+if [ ! -f "$STATUS" ]; then
+  ISO="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  printf '{"phase":"idle","loopDone":false,"updatedAt":"%s"}\n' "$ISO" > "$STATUS"
+fi
+
+APPROVALS="$TARGET/.apt/approvals.json"
+if [ ! -f "$APPROVALS" ]; then
+  printf '[]\n' > "$APPROVALS"
+fi
+
+GOAL="$TARGET/.apt/goal.md"
+if [ ! -f "$GOAL" ]; then
+  printf '<!-- /apt-goal will overwrite this with the product goal. Do not delete. -->\n' > "$GOAL"
+fi
+
 INJECT="$APT_HOME/scripts/inject-platform-assets.cjs"
 MCP_ENTRY="$APT_HOME/mcp-server/dist/index.js"
 WRITE_MCP="$APT_HOME/scripts/write-project-mcp-json.cjs"

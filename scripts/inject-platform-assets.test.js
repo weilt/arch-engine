@@ -53,10 +53,14 @@ describe("inject-platform-assets", () => {
 
   it("skillNameFromFile maps template names", () => {
     assert.equal(skillNameFromFile("plan-from-spec.md"), "apt-plan-from-spec");
+    assert.equal(skillNameFromFile("apt-goal.md"), "apt-goal");
+    assert.equal(skillNameFromFile("feature.md"), "apt-feature");
+    assert.equal(skillNameFromFile("auto-brainstorm.md"), "apt-auto-brainstorm");
+    assert.equal(skillNameFromFile("current-status.md"), "apt-current-status");
   });
 
-  it("PUBLIC_TEMPLATES has seven entries", () => {
-    assert.equal(PUBLIC_TEMPLATES.size, 7);
+  it("PUBLIC_TEMPLATES has ten entries", () => {
+    assert.equal(PUBLIC_TEMPLATES.size, 10);
   });
 });
 
@@ -120,23 +124,23 @@ describe("injectPlatformAssets integration", () => {
 
     assert.equal(
       fs.readdirSync(path.join(projectRoot, ".claude", "commands")).length,
-      7
+      10
     );
     assert.equal(
       fs.readdirSync(path.join(projectRoot, ".qoder", "commands")).length,
-      7
+      10
     );
     assert.equal(
       fs.readdirSync(path.join(projectRoot, ".zcode", "commands")).length,
-      7
+      10
     );
     assert.equal(
       fs.readdirSync(path.join(projectRoot, ".agents", "skills")).length,
-      7
+      10
     );
     assert.equal(
       fs.readdirSync(path.join(projectRoot, ".zcode", "skills")).length,
-      7
+      10
     );
     assert(!fs.existsSync(path.join(projectRoot, ".claude", "commands", "_feature-closeout.md")));
   });
