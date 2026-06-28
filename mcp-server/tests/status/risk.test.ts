@@ -63,6 +63,48 @@ describe("classifySpecRisk", () => {
   it("ignores unknown frontmatter risk values", () => {
     expect(
       classifySpecRisk({ frontmatter: { risk: "medium" }, text: "normal text" })
+   ).toBe("low");
+  });
+});
+
+// Independent, hard-coded assertions on Chinese spec bodies. These do NOT
+// derive from HIGH_RISK_KEYWORDS, so they catch a dropped Chinese synonym even
+// if the implementation's own list shrinks. Real specs in this repo are
+// written in Chinese, so these guard the actual production failure mode.
+describe("classifySpecRisk Chinese spec coverage (independent)", () => {
+  it("flags a breaking API spec body as high", () => {
+    expect(
+      classifySpecRisk({ text: "本次变更涉及破坏性 API" })
+    ).toBe("high");
+  });
+
+  it("flags a new MCP tool spec body as high", () => {
+    expect(
+      classifySpecRisk({ text: "新增了一个新 MCP 工具" })
+    ).toBe("high");
+  });
+
+  it("flags an arch pipeline spec body as high", () => {
+    expect(
+      classifySpecRisk({ text: "改动 arch 管线" })
+    ).toBe("high");
+  });
+
+  it("flags a new public contract spec body as high", () => {
+    expect(
+      classifySpecRisk({ text: "引入新对外契约" })
+    ).toBe("high");
+  });
+
+  it("flags a mixed Chinese/English breaking API body as high", () => {
+    expect(
+      classifySpecRisk({ text: "本次重构将导致 breaking API，需要评审" })
+    ).toBe("high");
+  });
+
+  it("does not flag a benign Chinese-only spec body as high", () => {
+    expect(
+      classifySpecRisk({ text: "修复了一个普通的文字排版问题" })
     ).toBe("low");
   });
 });

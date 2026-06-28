@@ -1,9 +1,11 @@
 import type { SpecRisk } from "./types.js";
 
-// High-risk keywords (ASCII English forms only). The Chinese synonyms from
-// spec section 6.2 are intentionally omitted to keep this file ASCII-only and
-// avoid Windows codepage corruption. Each English keyword already maps one to
-// one with the spec's risk category, so risk-category coverage is preserved.
+// High-risk keywords (English forms AND their Chinese synonyms per spec
+// section 6.2). The Chinese synonyms are required because real specs in this
+// repo are written in Chinese; without them a spec body like "破坏性 API"
+// would be misclassified as low and bypass human review. The shared Chinese
+// synonym "新 MCP" (for mcp-server / new MCP tool) and "arch 管线" (for
+// arch-engine / arch pipeline) are listed only once to avoid duplicates.
 export const HIGH_RISK_KEYWORDS: readonly string[] = [
   "mcp-server",
   "new MCP tool",
@@ -11,6 +13,10 @@ export const HIGH_RISK_KEYWORDS: readonly string[] = [
   "arch pipeline",
   "breaking API",
   "new public contract",
+  "新 MCP",
+  "arch 管线",
+  "破坏性 API",
+  "新对外契约",
 ];
 
 // Short-circuits to "high" on the first matching rule, otherwise "low".
