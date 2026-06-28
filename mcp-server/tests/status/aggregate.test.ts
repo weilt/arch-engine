@@ -239,4 +239,73 @@ describe("aggregateStatus", () => {
       .catch(() => false);
     expect(exists).toBe(true);
   });
+
+  // Regression guard for the loopDone "NOT spec_pending_approval" fix (spec 5
+  // condition 5): even with all tasks DONE + verify PASS + clean audit, a
+  // high-risk spec still pending approval must keep loopDone false and route
+  // the phase to spec_pending_approval. Before the fix loopDone was true.
+  it("high-risk pending spec keeps loopDone false despite all-done + PASS (spec 5 cond 5)", async () => {
+    await writeFiles(root, {
+      ".apt/goal.md": "Ship demo.\n",
+      [SPEC_REL]: "---\nrisk: high\n---\n# Risky\n\nA large redesign.\n",
+      ".apt/approvals.json": approvedSpec(SPEC_REL, "pending"),
+      [PLAN_REL]: "# Demo Plan\n",
+      ".apt/orchestration/progress.md": "- [x] a\n- [x] b\n",
+      ".apt/verify/latest.md": "# Verify Report\n\n**Overall:** PASS\n",
+    });
+    const status = await aggregateStatus(root, {
+      dbExists: stubs.dbOk,
+      audit: stubs.auditClean,
+    });
+    expect(status.phase).toBe("spec_pending_approval");
+    expect(status.loopDone).toBe(false);
+    expect(status.specRisk).toBe("high");
+    expect(status.specApproval).toBe("pending");
+  });
+
+  // Pins the documented "verifying" extension (spec 4.2): a stale PASS with a
+  // dirty (non-empty) arch audit routes to verifying, not done, so the agent is
+  // nudged to re-verify before the loop can terminate.
+  it("stale PASS with dirty audit routes to verifying, not done", async () => {
+    await writeFiles(root, {
+      ".apt/goal.md": "Ship demo.\n",
+      [SPEC_REL]: LOW_RISK_SPEC,
+      ".apt/approvals.json": approvedSpec(SPEC_REL, "approved"),
+      [PLAN_REL]: "# Demo Plan\n",
+      ".apt/orchestration/progress.md": "- [x] a\n- [x] b\n",
+      ".apt/verify/latest.md": "# Verify Report\n\n**Overall:** PASS\n",
+    });
+    const status = await aggregateStatus(root, {
+      dbExists: stubs.dbOk,
+      audit: async () => ({
+        anchor: { commit: "nogit", mode: "fileHashes" },
+        new: ["src/new-file.ts"],
+        modified: [],
+        deleted: [],
+        unregistered: [],
+      }),
+    });
+    expect(status.phase).toBe("verifying");
+    expect(status.loopDone).toBe(false);
+    expect(status.nextAction).toBe("verify");
+  });
+
+  // Pins the "planning gated on tasks.total===0" behavior: an approved spec
+  // with a plan present but no progress ledger yet stays in planning
+  // (nextAction implement_plan) rather than advancing to implementing.
+  it("approved spec + plan but no progress -> planning, implement_plan", async () => {
+    await writeFiles(root, {
+      ".apt/goal.md": "Ship demo.\n",
+      [SPEC_REL]: LOW_RISK_SPEC,
+      ".apt/approvals.json": approvedSpec(SPEC_REL, "approved"),
+      [PLAN_REL]: "# Demo Plan\n",
+    });
+    const status = await aggregateStatus(root, {
+      dbExists: stubs.dbOk,
+      audit: stubs.auditClean,
+    });
+    expect(status.phase).toBe("planning");
+    expect(status.nextAction).toBe("implement_plan");
+    expect(status.tasks).toEqual({ total: 0, done: 0, blocked: 0 });
+  });
 });

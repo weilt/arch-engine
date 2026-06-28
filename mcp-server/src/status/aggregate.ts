@@ -231,17 +231,23 @@ function defaultAudit(
 // Phase / loopDone / nextAction decision logic (spec 4.2 / 5 / 3.3)
 // ---------------------------------------------------------------------------
 
-// loopDone (spec 5): AND of all six conditions. verify PASS already implies
-// the audit is clean (spec 5.4), but we still AND-in the explicit four-bucket
-// emptiness check the spec mandates as a double-check.
+// loopDone (spec 5): AND of all six conditions. Condition 5 is "NOT
+// spec_pending_approval" (a high-risk spec still awaiting human approval keeps
+// the loop running) and the spec also requires "no blockers". We honor both
+// explicitly: `specPending` carries the pending-approval predicate (computed
+// once in aggregateStatus and reused by the phase decision tree), and
+// `blockers.length === 0` subsumes every blocker source (progress drift, arch
+// audit failure, and the db/last-scan blocked reason). verify PASS already
+// implies the audit is clean (spec 5.4), but `auditEmpty` is kept as the
+// mandated double-check.
 function computeLoopDone(args: {
   goal?: string;
   activePlan?: string;
   tasks?: TasksSummary;
   lastVerify: LastVerify;
   auditEmpty: boolean;
-  hasApprovalBlocker: boolean;
-  hasDesignBlocker: boolean;
+  specPending: boolean;
+  blockers: string[];
 }): boolean {
   const {
     goal,
@@ -249,8 +255,8 @@ function computeLoopDone(args: {
     tasks,
     lastVerify,
     auditEmpty,
-    hasApprovalBlocker,
-    hasDesignBlocker,
+    specPending,
+    blockers,
   } = args;
   return (
     Boolean(goal) &&
@@ -260,8 +266,8 @@ function computeLoopDone(args: {
     tasks.done === tasks.total &&
     lastVerify.result === "PASS" &&
     auditEmpty &&
-    !hasApprovalBlocker &&
-    !hasDesignBlocker
+    !specPending &&
+    blockers.length === 0
   );
 }
 
@@ -343,6 +349,14 @@ export async function aggregateStatus(
       )
     : undefined;
 
+  // Spec 5 condition 5 ("NOT spec_pending_approval"): a high-risk spec still
+  // awaiting human approval keeps the loop running. Computed once here and
+  // reused by both the phase decision tree (4.2) and computeLoopDone.
+  const specPending =
+    specRisk === "high" &&
+    specApproval !== "approved" &&
+    specApproval !== "auto_approved";
+
   const activePlan = await findActivePlan(projectRoot);
 
   const progressText = await readText(path.join(projectRoot, PROGRESS_REL));
@@ -384,17 +398,15 @@ export async function aggregateStatus(
   }
   if (blockedReason) blockers.push(blockedReason);
 
-  // 3. loopDone (independent AND of six conditions).
-  const hasApprovalBlocker = blockers.some((b) => /approval/i.test(b));
-  const hasDesignBlocker = blockers.some((b) => /design/i.test(b));
+  // 3. loopDone (independent AND of six conditions, spec 5).
   const loopDone = computeLoopDone({
     goal,
     activePlan,
     tasks,
     lastVerify,
     auditEmpty: auditCategoriesEmpty(auditResult),
-    hasApprovalBlocker,
-    hasDesignBlocker,
+    specPending,
+    blockers,
   });
 
   // 4. phase (precedence order, spec 4.2). Each branch is mutually exclusive.
@@ -409,11 +421,7 @@ export async function aggregateStatus(
     phase = "blocked";
   } else if (!activeSpec && !activePlan && !goal) {
     phase = "idle";
-  } else if (
-    specRisk === "high" &&
-    specApproval !== "approved" &&
-    specApproval !== "auto_approved"
-  ) {
+  } else if (specPending) {
     phase = "spec_pending_approval";
   } else if (activeSpec && specApproval === undefined) {
     phase = "brainstorming";
