@@ -13,6 +13,13 @@ import type { DesignPageRecipe, DesignProfile } from "./types.js";
 
 const HEX_COLOR_RE = /#[0-9a-fA-F]{3,8}\b/g;
 const PX_VALUE_RE = /\b\d+px\b/g;
+// Epsilon for comparing a sub-ms float mtime against an ISO-truncated
+// syncedAt (whole ms). profile.syncedAt comes from new Date().toISOString(),
+// so the true sync instant lies in [syncedMs, syncedMs+1); a file is only
+// unambiguously stale once currentMtime - syncedMs > 1. The smaller 0.5ms
+// float-jitter constant used in incremental.ts is not enough here because the
+// sub-ms fraction of a file written in the same wall-clock ms can exceed 0.5.
+const MTIME_ISO_EPSILON_MS = 1;
 
 const TOKEN_SCAN_EXTENSIONS = new Set([
   ".tsx",
@@ -97,7 +104,7 @@ async function detectStale(
   const files = await snapshotSourceFiles(projectRoot, sourceRel);
   const currentMtime = maxMtime(files);
   const syncedMs = Date.parse(profile.syncedAt);
-  if (!Number.isFinite(syncedMs) || currentMtime <= syncedMs) {
+  if (!Number.isFinite(syncedMs) || currentMtime - syncedMs <= MTIME_ISO_EPSILON_MS) {
     return [];
   }
   return [
