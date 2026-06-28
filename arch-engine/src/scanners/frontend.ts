@@ -10,6 +10,7 @@ import type {
 } from "../types.js";
 import { discoverExports } from "./ts-export.js";
 import { extractFromSource, extractVueScript } from "./ts-doc.js";
+import { archLog } from "../log.js";
 
 interface PackageJson {
   name?: string;
@@ -19,7 +20,7 @@ interface PackageJson {
   workspaces?: string[] | { packages?: string[] };
 }
 
-const SOURCE_GLOBS = ["src/**/*.{ts,tsx,vue}"];
+const SOURCE_GLOBS = ["src/**/*.{ts,tsx,js,jsx,mjs,vue}"];
 
 async function readJson<T>(filePath: string): Promise<T | null> {
   try {
@@ -267,14 +268,58 @@ function workspacePackageJsonGlobs(patterns: string[]): string[] {
   });
 }
 
+// P2: auto-discover frontend packages living in a non-JS repo root. When the
+// workspace probe is empty and there is no root package.json, scan the root's
+// direct child directories for any that hold a package.json with frontend deps
+// (vue/react), so a project whose frontend lives under e.g. "web/" is not
+// silently skipped.
+async function discoverChildFrontendPackages(
+  projectRoot: string
+): Promise<FrontendPackage[]> {
+  let entries;
+  try {
+    entries = await fs.readdir(projectRoot, { withFileTypes: true });
+  } catch {
+    return [];
+  }
+
+  const packages: FrontendPackage[] = [];
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue;
+    if (entry.name === "node_modules" || entry.name.startsWith(".")) continue;
+    const childDir = path.join(projectRoot, entry.name);
+    const pkg = await readJson<PackageJson>(path.join(childDir, "package.json"));
+    if (!pkg?.name) continue;
+    if (!inferFramework(pkg)) continue;
+    const scanned = await scanPackageDir(projectRoot, childDir);
+    if (scanned) packages.push(scanned);
+  }
+
+  packages.sort((a, b) => a.slug.localeCompare(b.slug));
+  return packages;
+}
+
 export async function scanFrontend(projectRoot: string): Promise<FrontendPackage[]> {
   const patterns = await getWorkspacePatterns(projectRoot);
 
   if (patterns.length === 0) {
     const rootPkg = await readJson<PackageJson>(path.join(projectRoot, "package.json"));
-    if (!rootPkg?.name) return [];
-    const pkg = await scanPackageDir(projectRoot, projectRoot);
-    return pkg ? [pkg] : [];
+    if (rootPkg?.name) {
+      const pkg = await scanPackageDir(projectRoot, projectRoot);
+      return pkg ? [pkg] : [];
+    }
+    // Non-JS repo root: auto-discover direct child frontend packages.
+    const discovered = await discoverChildFrontendPackages(projectRoot);
+    if (discovered.length > 0) {
+      archLog.info("frontend: discovered non-root frontend packages", {
+        slugs: discovered.map((p) => p.slug),
+      });
+      return discovered;
+    }
+    archLog.warn(
+      "frontend: no workspace, no root package.json, and no frontend child packages discovered"
+    );
+    return [];
   }
 
   const pkgJsonPaths = await fg.glob(workspacePackageJsonGlobs(patterns), {
