@@ -80,6 +80,8 @@ model: sonnet
 
 ## 6. 输出 Verify Report
 
+**硬规则（loopDone 依赖）：** 必须将本报告（含 Overall 行）另存为 `.apt/verify/latest.md`（SSOT，供 `query_project_status` 读取 `lastVerify.result`；spec §5.3 loopDone 必须含 verify PASS）。
+
 **必须**按下列结构输出（可选另存 `docs/apt/verify/YYYY-MM-DD-<slug>-report.md`）：
 
 ```markdown
