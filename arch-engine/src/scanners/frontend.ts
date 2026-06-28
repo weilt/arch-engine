@@ -6,6 +6,7 @@ import type {
   FrontendEnum,
   ApiClientContract,
   RouteEntry,
+  StoreContract,
   FrontendPackage,
   FrontendSymbol,
   RawCandidate,
@@ -15,6 +16,7 @@ import { extractFromSource, extractVueScript } from "./ts-doc.js";
 import { archLog } from "../log.js";
 import { extractApiClients, isApiClientFile } from "./frontend-api.js";
 import { extractRoutes, isRouterFile } from "./frontend-router.js";
+import { extractStores, isStoreFile } from "./frontend-store.js";
 
 interface PackageJson {
   name?: string;
@@ -201,6 +203,7 @@ async function scanPackageDir(
  const enums: FrontendEnum[] = [];
  const apiClients: ApiClientContract[] = [];
  const routes: RouteEntry[] = [];
+ const stores: StoreContract[] = [];
 const seenComponentFiles = new Set<string>();
   const seenUtilFiles = new Set<string>();
   const seenEnumKeys = new Set<string>();
@@ -239,6 +242,9 @@ const seenComponentFiles = new Set<string>();
       if (isRouterFile(content)) {
         routes.push(...extractRoutes(content));
       }
+      if (isStoreFile(content)) {
+        stores.push(...extractStores(content, relativeFile));
+      }
  
       if (discovered.length === 0 && doc.enums.length > 0) {
         for (const enumDoc of doc.enums) {
@@ -263,6 +269,7 @@ const seenComponentFiles = new Set<string>();
   enums.sort((a, b) => a.name.localeCompare(b.name));
  apiClients.sort((a, b) => a.name.localeCompare(b.name));
  routes.sort((a, b) => a.path.localeCompare(b.path));
+ stores.sort((a, b) => a.name.localeCompare(b.name));
 
   return {
     slug: moduleSlug,
@@ -274,6 +281,7 @@ const seenComponentFiles = new Set<string>();
    enums,
    apiClients,
    routes,
+   stores,
 };
 }
 
