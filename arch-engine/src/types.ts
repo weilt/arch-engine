@@ -42,6 +42,34 @@ export interface FrontendPackage {
   components: FrontendSymbol[];
   utils: FrontendSymbol[];
   enums: FrontendEnum[];
+  apiClients?: ApiClientContract[];
+  routes?: RouteEntry[];
+  stores?: StoreContract[];
+}
+
+export interface ApiClientContract {
+  name: string;
+  file: string;
+  description: string;
+  endpoints: { method: "GET" | "POST" | "PUT" | "DELETE" | "PATCH"; path: string }[];
+}
+
+export interface RouteEntry {
+  path: string;
+  name?: string;
+  component?: string;
+  meta?: Record<string, unknown>;
+  children?: RouteEntry[];
+}
+
+export interface StoreContract {
+  name: string;
+  storeId?: string;
+  file: string;
+  description: string;
+  state: string[];
+  getters: string[];
+  actions: string[];
 }
 
 export interface JavaModule {
@@ -67,7 +95,10 @@ export type AssetKind =
   | "enum"
   | "starter"
   | "pojo"
-  | "contract";
+  | "contract"
+  | "api-client"
+  | "route"
+  | "store";
 
 export interface AssetCard {
   id: string;
@@ -108,7 +139,10 @@ export interface ArchChunk {
     | "overview"
     | "convention"
     | "starter"
-    | "pojo";
+    | "pojo"
+    | "api-client"
+    | "route"
+    | "store";
   title: string;
   text: string;
 }
