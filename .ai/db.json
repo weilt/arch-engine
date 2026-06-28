@@ -1,1 +1,17 @@
-{"contracts":[],"missingRequests":[]}
+{
+  "contracts": [
+    {
+      "name": "ProjectStatus",
+      "description": "Return contract of the read-only query_project_status MCP tool (the 16th tool). Describes the aggregate APT autonomous-loop status recomputed by status/aggregate.ts. Fields: phase (idle/brainstorming/spec_pending_approval/planning/implementing/verifying/done/blocked), loopDone (true only when all six spec §5 conditions hold, incl. verify PASS), nextAction (single recommended slash-command action per spec §3.3), plus goal/activeSpec/activePlan/specRisk/specApproval/tasks/lastVerify/blockers/summary. Consumed by /current-status, /apt-goal's per-turn decision, and apt-status --json.",
+      "tsFilePath": "mcp-server/src/status/types.ts",
+      "registeredAt": "2026-06-28T03:48:15.520Z"
+    },
+    {
+      "name": "StatusSnapshot",
+      "description": "Shape persisted to .apt/status.json by status/aggregate.ts writeStatusSnapshot/handleQueryProjectStatus. The recomputed ProjectStatus is the source of truth; this snapshot is a cache with updatedAt. Fields: phase, loopDone, nextAction, updatedAt (ISO). Committed to Git (spec §8); .apt/orchestration/ stays gitignored.",
+      "tsFilePath": "mcp-server/src/status/types.ts",
+      "registeredAt": "2026-06-28T03:48:15.622Z"
+    }
+  ],
+  "missingRequests": []
+}
