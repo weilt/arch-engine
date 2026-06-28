@@ -4,6 +4,7 @@ import fg from "fast-glob";
 import { parse as parseYaml } from "yaml";
 import type {
   FrontendEnum,
+  ApiClientContract,
   FrontendPackage,
   FrontendSymbol,
   RawCandidate,
@@ -11,6 +12,7 @@ import type {
 import { discoverExports } from "./ts-export.js";
 import { extractFromSource, extractVueScript } from "./ts-doc.js";
 import { archLog } from "../log.js";
+import { extractApiClients, isApiClientFile } from "./frontend-api.js";
 
 interface PackageJson {
   name?: string;
@@ -192,10 +194,11 @@ async function scanPackageDir(
   const moduleSlug = slugFromPackageName(pkg.name);
   const files = await collectSourceFiles(pkgDir);
 
-  const components: FrontendSymbol[] = [];
-  const utils: FrontendSymbol[] = [];
-  const enums: FrontendEnum[] = [];
-  const seenComponentFiles = new Set<string>();
+ const components: FrontendSymbol[] = [];
+ const utils: FrontendSymbol[] = [];
+ const enums: FrontendEnum[] = [];
+  const apiClients: ApiClientContract[] = [];
+ const seenComponentFiles = new Set<string>();
   const seenUtilFiles = new Set<string>();
   const seenEnumKeys = new Set<string>();
 
@@ -222,10 +225,14 @@ async function scanPackageDir(
           const key = `${relativeFile}:${exportItem.name}`;
           if (seenEnumKeys.has(key)) continue;
           enums.push(buildFrontendEnum(relativeFile, doc, exportItem.name));
-          seenEnumKeys.add(key);
-        }
-      }
+         seenEnumKeys.add(key);
+       }
+     }
 
+      if (isApiClientFile(content)) {
+        apiClients.push(...extractApiClients(content, relativeFile));
+      }
+ 
       if (discovered.length === 0 && doc.enums.length > 0) {
         for (const enumDoc of doc.enums) {
           const key = `${relativeFile}:${enumDoc.name}`;
@@ -247,6 +254,7 @@ async function scanPackageDir(
   components.sort((a, b) => a.name.localeCompare(b.name));
   utils.sort((a, b) => a.name.localeCompare(b.name));
   enums.sort((a, b) => a.name.localeCompare(b.name));
+  apiClients.sort((a, b) => a.name.localeCompare(b.name));
 
   return {
     slug: moduleSlug,
@@ -256,6 +264,7 @@ async function scanPackageDir(
     components,
     utils,
     enums,
+    apiClients,
   };
 }
 
