@@ -29,6 +29,24 @@
       "description": "Outcome of a /verify run, parsed from `.apt/verify/latest.md` by status/verify-parse.ts parseVerifyReport/readLatestVerify. \"PASS\" | \"FAIL\" | \"BLOCKED\" | \"none\" (missing/parseable-less report). Critical to loopDone (spec §5.3): the loop can only complete when lastVerify.result === \"PASS\". A BLOCKED result (e.g. missing last-scan.json) maps nextAction=start_init. String-literal union alias defined inline in mcp-server/src/status/types.ts.",
       "tsFilePath": "mcp-server/src/status/types.ts",
       "registeredAt": "2026-06-28T07:07:37.670Z"
+    },
+    {
+      "name": "ApiClientContract",
+      "description": "Frontend API-client contract: one card per file using axios/request wrapper. Fields: name, file, description, endpoints[] ({ method: GET|POST|PUT|DELETE|PATCH; path }). Extracted by frontend-api.ts extractApiClients. Populates FrontendPackage.apiClients.",
+      "tsFilePath": "arch-engine/src/types.ts",
+      "registeredAt": "2026-06-28T11:48:55.967Z"
+    },
+    {
+      "name": "RouteEntry",
+      "description": "Frontend route entry (vue-router / React <Route>). Fields: path, name?, component?, meta? (Record<string,unknown>), children? (flattened by extractor with parent+child path concatenation). Extracted by frontend-router.ts extractRoutes. Populates FrontendPackage.routes.",
+      "tsFilePath": "arch-engine/src/types.ts",
+      "registeredAt": "2026-06-28T11:48:56.032Z"
+    },
+    {
+      "name": "StoreContract",
+      "description": "Frontend store contract (Pinia defineStore / Vuex Store / createStore). Fields: name, storeId?, file, description, state[], getters[], actions[]. Mutations fold into actions for Vuex. Extracted by frontend-store.ts extractStores. Populates FrontendPackage.stores.",
+      "tsFilePath": "arch-engine/src/types.ts",
+      "registeredAt": "2026-06-28T11:48:56.101Z"
     }
   ],
   "missingRequests": []
