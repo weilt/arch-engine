@@ -2,7 +2,7 @@
 
 > **Spec:** `docs/superpowers/specs/2026-06-29-apt-brainstorm-ontology-design.md`
 > **Command:** `/plan-from-spec`
-> **Status:** draft
+> **Status:** approved
 
 **Goal:** Ship a context-aware APT-native `/auto-brainstorm` plus a read-only `query_ontology` MCP tool (the 17th) so AI can query the project's real state before designing features.
 
