@@ -18,6 +18,7 @@ import { handleReportDesignGap } from "./design-gap.js";
 import { handleRegisterUiPattern } from "./design-register.js";
 import { handleAuditDesignChanges } from "./design-audit.js";
 import { handleQueryProjectStatus } from "./status/aggregate.js";
+import { handleQueryOntology } from "./ontology-query.js";
 
 const projectRoot = getProjectRoot();
 
@@ -507,14 +508,33 @@ server.tool(
   "Aggregate APT autonomous-loop status: phase, loopDone, nextAction (read-only)",
   {},
   async () => {
+  try {
+    const r = await handleQueryProjectStatus(projectRoot);
+    return {
+      content: [{ type: "text" as const, text: JSON.stringify(r, null, 2) }],
+    };
+  } catch (err) {
+    return {
+      content: [{ type: "text" as const, text: "Error: " + String(err) }],
+      isError: true,
+    };
+  }
+}
+);
+
+server.tool(
+  "query_ontology",
+  "Query project ontology: no-arg = project snapshot (status/modules/packages/contracts/design/progress); with topic = focused retrieval (assets/contracts/designPages). Read-only. Use during brainstorming to ground design in the project's real state.",
+  { topic: z.string().optional().describe("Topic to focus on (e.g. auth, Order). Omit for a full project snapshot.") },
+  async ({ topic }) => {
     try {
-      const r = await handleQueryProjectStatus(projectRoot);
+      const result = await handleQueryOntology(projectRoot, topic);
       return {
-        content: [{ type: "text" as const, text: JSON.stringify(r, null, 2) }],
+        content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
       };
     } catch (err) {
       return {
-        content: [{ type: "text" as const, text: "Error: " + String(err) }],
+        content: [{ type: "text" as const, text: String(err) }],
         isError: true,
       };
     }
