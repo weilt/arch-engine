@@ -1,49 +1,77 @@
-# Task 4 Report: /design-page 命令模板与分发
+# Task 4 Report — P0-2 + P1 + P2 baseline fixes
 
-**Plan:** `docs/apt/plans/2026-06-24-design-knowledge-layer-completion-plan.md`  
-**Status:** completed  
-**Date:** 2026-06-24
+**Status:** DONE (green + tsc 0)
+**Commit SHA:** `31ba18d81168a6b911835c6652f69f4640b4c0ab`
+**Date:** 2026-06-28
 
-## 交付物
+## Verification
 
-| 文件 | 说明 |
-|------|------|
-| `templates/design-page.md` | 斜杠命令源模板（baoyu 单页 → `design-sync --pages-only` → 可选 `design-bindings --check`） |
-| `.agents/skills/apt-design-page/SKILL.md` | Codex skill（无 `model` frontmatter） |
-| `.claude/commands/design-page.md` | Claude/Cursor 分发产物 |
-| `.qoder/commands/design-page.md` | Qoder 分发产物 |
-| `scripts/inject-platform-assets.cjs` | `PUBLIC_TEMPLATES` 增至 7 项 |
-| `scripts/inject-platform-assets.test.js` | 断言 7 个公开模板 |
-| `templates/_agents-md-snippet.md` | 命令表新增 `/design-page` \| `apt-design-page` |
-| `AGENTS.md` | 由 inject 同步更新 |
-| `README.md` | 命令表与设计知识层小节补充 `/design-page` |
+| Check | Command | Result |
+-------|---------|--------|
+| vitest (new files) | `npx vitest run tests/scanners/frontend.test.ts tests/pipeline.test.ts` | `Test Files 2 passed (2)`, `Tests 10 passed (10)` |
+| tsc | `node node_modules/typescript/bin/tsc --noEmit` | exit code **0** |
 
-## 流程摘要
-
-`/design-page` 面向**已有全局设计**的项目，协调单页原型定稿：
-
-1. 确认页面 slug 与用途；无全局层时引导 `/design-system`
-2. baoyu-design（或其它工具）产出单页 HTML/JSON 真源
-3. `design-sync --source designs/<path> --pages-only`（支持 `--dry-run`、`--incremental`）
-4. 可选 `design-bindings --check` / `--strict`（已配置组件库时）
-5. MCP 验收：`query_design(page: …)`、`search_ui`
-
-## 验证
-
-```bash
-node scripts/inject-platform-assets.test.js
-```
-
-结果：**8 tests, 0 fail**
-
-```bash
-node scripts/inject-platform-assets.cjs . .
-```
-
-结果：`.claude/commands`、`.qoder/commands`、`.agents/skills`、`AGENTS.md` 均已更新。
-
-## 提交
+## git show --stat
 
 ```
-feat(design): add /design-page command and platform distribution
+commit 31ba18d81168a6b911835c6652f69f4640b4c0ab
+    feat(scanners): extend source globs + non-JS-root discovery + new-package incremental
+
+ arch-engine/src/pipeline.ts                 |  67 +++++++++++++++--
+ arch-engine/src/scanners/frontend.ts        |  53 +++++++++++++-
+ arch-engine/tests/pipeline.test.ts          |  27 +++++++
+ arch-engine/tests/scanners/frontend.test.ts | 109 +++++++++++++++++++++++++++-
+ 4 files changed, 246 insertions(+), 10 deletions(-)
 ```
+
+Staged exactly the 4 whitelisted paths; no unrelated dirty-worktree changes were
+included (`git diff --cached --name-only` confirmed the 4 files before commit).
+
+## Changes by item
+
+### P0-2 — SOURCE_GLOBS (`frontend.ts`)
+`SOURCE_GLOBS` extended to `["src/**/*.{ts,tsx,js,jsx,mjs,vue}"]`. `collectSourceFiles`
+now picks up plain `.js/.jsx/.mjs`. Note: `.js/.jsx/.mjs` classify as `util` (only
+`.tsx`/`.vue` are component files per `ts-export.ts isComponentFile`), which the
+tests assert via the collected file paths.
+
+### P2-a — config.frontendPackages priority (`pipeline.ts`)
+**Yes, config is passed into `resolveFrontendPackageDirs`.** Added a second param
+`frontendPackages?: string[]` and the call site now passes
+`config.frontendPackages`. When non-empty, each entry is resolved (absolute OR
+relative to projectRoot), validated for a `package.json` with a `name`, slugified,
+and returned in the dirs map, bypassing workspace probing entirely. A new local
+helper `slugFromPkgName` de-duplicates the slug logic between the config branch and
+the existing workspace branch. Logged via `archLog.info` so it is not a silent
+success. When empty/absent, falls through to the original workspace logic unchanged.
+
+### P2-b — non-JS-root auto-discovery (`frontend.ts`)
+**Hooked in `scanFrontend`'s empty-pattern branch**, not `getWorkspacePatterns`.
+Rationale: `getWorkspacePatterns` is a pure workspace probe; the empty-pattern
+branch is the natural trigger point and already has `projectRoot` plus the
+`scanPackageDir` reuse. A new module-private helper `discoverChildFrontendPackages`
+scans the root's direct child dirs (skipping `node_modules` and dot-dirs) for any
+with a `package.json` that has frontend deps (reuses `inferFramework`). Discovered
+packages are logged via `archLog.info`; when nothing is discoverable it logs an
+`archLog.warn` so the empty result is never silent.
+
+### P1 — new-package / new-module incremental detection (`pipeline.ts`)
+In the incremental branch, after `mapFilesToPackages`, newly-added units present
+now but absent from `previousScan` are pulled into the affected sets:
+packages via `packageDirs.keys()` vs `previousScan.packages`, and backend modules
+via `model.modules` slugs vs `previousScan.modules`. **Extracted a pure helper**
+`detectNewUnits(currentSlugs, previousSlugs): Set<string>` (exported from
+`pipeline.ts`) which is unit-tested directly in `tests/pipeline.test.ts`, then
+wired into the incremental block. A `newPackages`/`newModules` count is added to
+the existing `start-init: incremental mode` log line.
+
+## Notes
+
+- `mapFilesToPackages` signature in `git-diff.ts` was NOT changed (per plan);
+  the new-package detection lives entirely in `pipeline.ts`.
+- `frontendPackages` field already existed on `ArchConfig` + `DEFAULT_CONFIG`
+  (Task 2); this task only adds the consumer.
+- All new code is ASCII; `.js` specifiers used for relative imports (Node16 ESM).
+- `let entries;` (untyped) inside try/catch matches the existing pattern in
+  `design/audit.ts`; it is allowed under `strict` and avoids a brittle cross
+  `@types/node`-version `Dirent` annotation.
