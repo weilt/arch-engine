@@ -221,5 +221,7 @@ export interface ArchConfig {
  designSystemPackages?: string[];
   /** Optional glob patterns for frontend app packages not at the JS repo root (e.g. "web", "admin-ui"). */
   frontendPackages?: string[];
+  /** Optional manually-declared project metadata for ontology snapshot (v2.0.2). */
+  projectMeta?: { name?: string; techStack?: string[] } | null;
  scanners: { java: boolean; frontend: boolean };
 }

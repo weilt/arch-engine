@@ -19,6 +19,7 @@ export const DEFAULT_CONFIG: ArchConfig = {
   apiSpecGlobs: ["docs/**/*.json", "**/openapi.json", "**/swagger.json"],
  designSystemPackages: [],
   frontendPackages: [],
+  projectMeta: null,
  scanners: { java: true, frontend: true },
 };
 
