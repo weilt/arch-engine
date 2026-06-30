@@ -19,7 +19,7 @@
 | 设计系统同步 | `/design-system` | `apt-design-system` |
 | 单页设计定稿 | `/design-page` | `apt-design-page` |
 | 自主闭环主入口 | `/apt-goal` | `apt-goal`（ZCode 亦可用 `$apt-goal`） |
-| AI brainstorming | `/auto-brainstorm` | `apt-auto-brainstorm` |
+| APT 原生 brainstorming 引擎：9 步 + ontology 感知 + 风险分级，low 自动批、high 停等人批，终端接 /plan-from-spec | `/auto-brainstorm` | `apt-auto-brainstorm` |
 | 当前进度 | `/current-status` | `apt-current-status` |
 
 ### 推荐流程

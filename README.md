@@ -59,7 +59,7 @@ APT 用四层机制解决这些问题：
 | **`/design-system`** | 立项定视觉：`design-sync` 沉淀到 `.ai/design/` |
 | **`/design-page`** | 单页原型定稿：`design-sync --pages-only`，可选 `design-bindings --check` |
 | **`/apt-goal`** | 自主闭环主入口：外层 loop 强制走全流程（brainstorm / spec / plan / implement / verify），主 Agent 仅编排 |
-| **`/auto-brainstorm`** | AI brainstorming 生成 spec 并风险分级（low 自动批、high 停等人批） |
+| **`/auto-brainstorm`** | APT 原生 brainstorming 引擎：9 步 + ontology 感知 + 风险分级，low 自动批、high 停等人批，终端接 /plan-from-spec |
 | **`/current-status`** | 人读项目进度与建议下一步 |
 
 > **迁移：** `/start-feature` 已移除。无 spec 请用 `/feature`；有 spec 请用 `/plan-from-spec` → `/implement-plan`。实现后请用 `/verify` 验收。
