@@ -32,6 +32,11 @@ import {
 import { resolveJavaPathRules } from "./scanners/java-path-rules.js";
 import { mergeDocumentModel } from "./scanners/merge.js";
 import { scanOpenApiGlobs } from "./scanners/openapi.js";
+import { scanJpaEntities } from "./scanners/entity-jpa.js";
+import { scanMybatisEntities } from "./scanners/entity-mybatis.js";
+import { scanSqlEntities } from "./scanners/entity-sql.js";
+import { mergeEntityGraphs } from "./scanners/entity-merge.js";
+import { deriveFlowGraph } from "./scanners/flow-scanner.js";
 import type {
   ArchChunk,
   ArchConfig,
@@ -58,6 +63,8 @@ import {
   type ArchIndex,
 } from "./writer/index.js";
 import { writeModuleAssetDocs } from "./writer/asset-md.js";
+import { writeEntityDocs } from "./writer/entity-md.js";
+import { writeFlowDocs } from "./writer/flow-md.js";
 import { buildDesignArchAlignment } from "./design/alignment.js";
 import { getDesignProfilePath } from "./design/paths.js";
 
@@ -426,6 +433,47 @@ export async function runStartInit(
     incremental,
   });
 
+  // v2.0.3: Entity layer scanning (JPA + MyBatis + SQL)
+  const entityNames = new Set<string>();
+  if (config.scanners.java) {
+    try {
+      const jpa = await scanJpaEntities(projectRoot, modules);
+      const mybatis = await scanMybatisEntities(projectRoot, modules);
+      const sql = await scanSqlEntities(projectRoot);
+      const merged = mergeEntityGraphs(jpa, mybatis, sql);
+      if (merged.entities.length > 0) {
+        model.entities = merged;
+        for (const e of merged.entities) entityNames.add(e.name);
+        archLog.info("start-init: entity scan complete", {
+          entities: merged.entities.length,
+          relations: merged.relations.length,
+        });
+      }
+    } catch (e) {
+      archLog.warn("start-init: entity scan failed (non-fatal)", {
+        error: e instanceof Error ? e.message : String(e),
+      });
+    }
+  }
+
+  // v2.0.3: Flow layer derivation (only when entities exist)
+  if (entityNames.size > 0) {
+    try {
+      const flows = await deriveFlowGraph(projectRoot, [...entityNames], model);
+      if (flows.nodes.length > 0) {
+        model.flows = flows;
+        archLog.info("start-init: flow derivation complete", {
+          nodes: flows.nodes.length,
+          edges: flows.edges.length,
+        });
+      }
+    } catch (e) {
+      archLog.warn("start-init: flow derivation failed (non-fatal)", {
+        error: e instanceof Error ? e.message : String(e),
+      });
+    }
+  }
+
   if (!incremental) {
     archLog.info("start-init: writing base markdown and index");
     await writeMarkdownTree(projectRoot, model);
@@ -604,6 +652,26 @@ export async function runStartInit(
       affectedPrefixes
     );
     await writeIndexMd(projectRoot, updatedIndex);
+  }
+
+  // v2.0.3: persist entity/flow docs after the markdown index is final.
+  if (model.entities) {
+    try {
+      await writeEntityDocs(projectRoot, model.entities);
+    } catch (e) {
+      archLog.warn("start-init: entity doc write failed", {
+        error: e instanceof Error ? e.message : String(e),
+      });
+    }
+  }
+  if (model.flows) {
+    try {
+      await writeFlowDocs(projectRoot, model.flows);
+    } catch (e) {
+      archLog.warn("start-init: flow doc write failed", {
+        error: e instanceof Error ? e.message : String(e),
+      });
+    }
   }
 
   const fileHashMap = await collectTrackedSourceHashes(
