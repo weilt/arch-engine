@@ -47,6 +47,24 @@
       "description": "Frontend store contract (Pinia defineStore / Vuex Store / createStore). Fields: name, storeId?, file, description, state[], getters[], actions[]. Mutations fold into actions for Vuex. Extracted by frontend-store.ts extractStores. Populates FrontendPackage.stores.",
       "tsFilePath": "arch-engine/src/types.ts",
       "registeredAt": "2026-06-28T11:48:56.101Z"
+    },
+    {
+      "name": "ProjectOntology",
+      "description": "Return contract of the read-only query_ontology(topic?) MCP tool when called without a topic. Describes the full project ontology snapshot recomposed by ontology-query.ts (spec section 3.2) across the loop status, progress, backend modules, frontend packages, registered contracts, and design-system coverage. Fields: project (ProjectMeta|null), status (OntologyStatus: phase/loopDone/nextAction/activeGoal?), progress? (OntologyProgress: currentTask?/doneCount/totalCount), modules[] (ModuleOntology: slug/name/assetCounts), packages[] (PackageOntology: slug/name/framework?/assetCounts), contracts[] (OntologyContract: name/tsFile), design? (OntologyDesign: hasTokens/hasBindings/pages/components), approvalState? (OntologyApprovalState: specRisk?/state?). Consumed by the no-arg query_ontology MCP tool via /auto-brainstorm.",
+      "tsFilePath": "mcp-server/src/ontology/types.ts",
+      "registeredAt": "2026-06-30T02:05:53.594Z"
+    },
+    {
+      "name": "OntologyTopicResult",
+      "description": "Return contract of the read-only query_ontology(topic) MCP tool when called with a topic. Describes the focused topic-lookup result produced by ontology-query.ts, scanning module/package names, contract names, and design pages for matches. Fields: topic (the queried string), matchedIn[] (scopes that matched), assets[] (SearchHit from semantic search), contracts[] (OntologyContract hits), designPages? (matching design page ids). Consumed by the query_ontology(topic) MCP tool via /auto-brainstorm.",
+      "tsFilePath": "mcp-server/src/ontology/types.ts",
+      "registeredAt": "2026-06-30T02:06:03.484Z"
+    },
+    {
+      "name": "ProjectMeta",
+      "description": "Return contract of the manually-declared project metadata surfaced in the ontology snapshot. Fields: name? (project display name), techStack?[] (declared technology-stack tags). Authored in arch.config.json under projectMeta and consumed by ontology-query.ts and the query_ontology MCP tool.",
+      "tsFilePath": "mcp-server/src/ontology/types.ts",
+      "registeredAt": "2026-06-30T02:06:11.648Z"
     }
   ],
   "missingRequests": []

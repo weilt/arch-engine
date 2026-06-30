@@ -1,77 +1,28 @@
-# Task 4 Report — P0-2 + P1 + P2 baseline fixes
+# Task 4 Report — query_ontology handler
 
-**Status:** DONE (green + tsc 0)
-**Commit SHA:** `31ba18d81168a6b911835c6652f69f4640b4c0ab`
-**Date:** 2026-06-28
+**Status:** `DONE`
 
-## Verification
+## 交付物
+- `mcp-server/src/ontology-query.ts`（新建）：`handleQueryOntology(projectRoot, topic?)` 返回 `ProjectOntology | OntologyTopicResult | { error }`。
+- `mcp-server/tests/ontology-query.test.ts`（新建）：5 个用例，全绿。
+- commit `444b37b`（仅白名单两文件，`git add` 精确）。
 
-| Check | Command | Result |
--------|---------|--------|
-| vitest (new files) | `npx vitest run tests/scanners/frontend.test.ts tests/pipeline.test.ts` | `Test Files 2 passed (2)`, `Tests 10 passed (10)` |
-| tsc | `node node_modules/typescript/bin/tsc --noEmit` | exit code **0** |
+## Verify（两步全绿）
+1. `node node_modules/typescript/bin/tsc --noEmit` → exit 0。
+2. `npx vitest run tests/ontology-query.test.ts` → 5 passed。
 
-## git show --stat
+## 实现要点
+- **入口守卫**：`arch-index.json` 不存在 → `{ error: "project not initialized; run start-init first" }`（唯一硬错）；外层 + 各子字段独立 try/catch，恒不抛错。
+- **快照模式**：project（`loadOrInitConfig`，created→null）；status（`aggregateStatus` 只读，非 `handleQueryProjectStatus`，避免 write-back）；progress?（tasks.total>0 才输出，currentTask 读 progress.md 首个未完成 checkbox 行）；modules/packages（Task 3）；contracts（`readDb`→map，缺 db→空）；design?（tokens 目录有 json 或 profile.json 存在→检测；pages/components 取 *.json 去 .json 后缀）；approvalState?（复用 `st.specRisk`/`st.specApproval`，不重读 approvals/risk；两者皆无→字段缺省）。
+- **焦点模式**：assets（`handleSearchArch` try/catch→空，无 vector db 不崩）；contracts（topic 小写子串匹配 name）；designPages?（设计层存在时 pages slug 子串匹配）；matchedIn（透明聚合命中层）。
+- **类型**：`noImplicitAny` 下给 `let modules/packages/assets: T[]` 显式标注（ModuleOntology/PackageOntology/SearchHit）。
 
-```
-commit 31ba18d81168a6b911835c6652f69f4640b4c0ab
-    feat(scanners): extend source globs + non-JS-root discovery + new-package incremental
+## 测试 fixture（真实最小集，无 mock）
+写 `.ai/arch/backend/foo/utils.md`（1 个 `## Bar`）+ `.ai/db.json`（BarContract）+ `.ai/arch/arch-index.json`（backend/foo 节点）+ `.ai/arch/last-scan.json`（version 2，空 modules/packages）→ aggregateStatus 真实跑通不 blocked（audit 空四类）。覆盖：无 arch-index→error；最小快照含 modules(slug=foo, util=1)/contracts/status；焦点 bar 命中 contracts 且 matchedIn 含 contracts、assets 空；缺 db.json→contracts 空不崩；设计层检测（tokens/pages）。
 
- arch-engine/src/pipeline.ts                 |  67 +++++++++++++++--
- arch-engine/src/scanners/frontend.ts        |  53 +++++++++++++-
- arch-engine/tests/pipeline.test.ts          |  27 +++++++
- arch-engine/tests/scanners/frontend.test.ts | 109 +++++++++++++++++++++++++++-
- 4 files changed, 246 insertions(+), 10 deletions(-)
-```
+## 待办（后续 Task）
+- **不注册契约**：本 Task 未注册 `ProjectOntology`/`OntologyTopicResult`/`ProjectMeta` 到 index.ts（Task 8 统一注册 MCP 工具）。
+- **无架构资产变更**：仅新增 mcp-server 两个文件，未动 `.ai/`。
 
-Staged exactly the 4 whitelisted paths; no unrelated dirty-worktree changes were
-included (`git diff --cached --name-only` confirmed the 4 files before commit).
-
-## Changes by item
-
-### P0-2 — SOURCE_GLOBS (`frontend.ts`)
-`SOURCE_GLOBS` extended to `["src/**/*.{ts,tsx,js,jsx,mjs,vue}"]`. `collectSourceFiles`
-now picks up plain `.js/.jsx/.mjs`. Note: `.js/.jsx/.mjs` classify as `util` (only
-`.tsx`/`.vue` are component files per `ts-export.ts isComponentFile`), which the
-tests assert via the collected file paths.
-
-### P2-a — config.frontendPackages priority (`pipeline.ts`)
-**Yes, config is passed into `resolveFrontendPackageDirs`.** Added a second param
-`frontendPackages?: string[]` and the call site now passes
-`config.frontendPackages`. When non-empty, each entry is resolved (absolute OR
-relative to projectRoot), validated for a `package.json` with a `name`, slugified,
-and returned in the dirs map, bypassing workspace probing entirely. A new local
-helper `slugFromPkgName` de-duplicates the slug logic between the config branch and
-the existing workspace branch. Logged via `archLog.info` so it is not a silent
-success. When empty/absent, falls through to the original workspace logic unchanged.
-
-### P2-b — non-JS-root auto-discovery (`frontend.ts`)
-**Hooked in `scanFrontend`'s empty-pattern branch**, not `getWorkspacePatterns`.
-Rationale: `getWorkspacePatterns` is a pure workspace probe; the empty-pattern
-branch is the natural trigger point and already has `projectRoot` plus the
-`scanPackageDir` reuse. A new module-private helper `discoverChildFrontendPackages`
-scans the root's direct child dirs (skipping `node_modules` and dot-dirs) for any
-with a `package.json` that has frontend deps (reuses `inferFramework`). Discovered
-packages are logged via `archLog.info`; when nothing is discoverable it logs an
-`archLog.warn` so the empty result is never silent.
-
-### P1 — new-package / new-module incremental detection (`pipeline.ts`)
-In the incremental branch, after `mapFilesToPackages`, newly-added units present
-now but absent from `previousScan` are pulled into the affected sets:
-packages via `packageDirs.keys()` vs `previousScan.packages`, and backend modules
-via `model.modules` slugs vs `previousScan.modules`. **Extracted a pure helper**
-`detectNewUnits(currentSlugs, previousSlugs): Set<string>` (exported from
-`pipeline.ts`) which is unit-tested directly in `tests/pipeline.test.ts`, then
-wired into the incremental block. A `newPackages`/`newModules` count is added to
-the existing `start-init: incremental mode` log line.
-
-## Notes
-
-- `mapFilesToPackages` signature in `git-diff.ts` was NOT changed (per plan);
-  the new-package detection lives entirely in `pipeline.ts`.
-- `frontendPackages` field already existed on `ArchConfig` + `DEFAULT_CONFIG`
-  (Task 2); this task only adds the consumer.
-- All new code is ASCII; `.js` specifiers used for relative imports (Node16 ESM).
-- `let entries;` (untyped) inside try/catch matches the existing pattern in
-  `design/audit.ts`; it is allowed under `strict` and avoids a brittle cross
-  `@types/node`-version `Dirent` annotation.
+## 给下一 Task 的 handoff
+Task 5 负责 `query_ontology` 工具注册到 `index.ts`（tool 定义 + 路由到 `handleQueryOntology`）。类型 `ProjectOntology/OntologyTopicResult` 已在 `ontology/types.ts` 就绪（Task 1）。handler import 路径 `./ontology-query.js`。
