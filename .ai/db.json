@@ -86,9 +86,33 @@
     },
     {
       "name": "handleQueryOntology",
-      "description": "Core handler for the query_ontology MCP tool (v2.0.2 17th tool, updated in v2.0.3). Two modes: (1) no-arg snapshot returns ProjectOntology (project from projectMeta, status from aggregateStatus read-only, progress?, modules/packages from markdown header counts, contracts from db.json, design? when design layer detected, approvalState?, relations? from entities.json when entity layer exists); (2) topic focus returns OntologyTopicResult (assets via search_arch, contracts by name match, designPages by slug match). v2.0.3 adds relations field loaded from .ai/arch/entities.json behind try/catch — silent omit when missing or corrupt.",
+      "description": "Core handler for the query_ontology MCP tool (v2.0.2 17th tool, updated v2.0.3 relations, updated v2.0.4 topology+drill). Two modes: (1) no-arg snapshot returns ProjectOntology (project, status, progress?, modules, packages, contracts, design?, approvalState?, relations?, topology?); v2.0.4 adds topology field with moduleCount/rpcEndpoints/entityCount/flowEdgeCount/crossServiceRefs aggregated from entities.json/flow.json; (2) topic focus returns OntologyTopicResult (assets via search_arch, contracts by name match, designPages by slug match); v2.0.4 adds entities? and flowSummary? when topic matches a moduleSlug. All subfields behind try/catch, fault-tolerant.",
       "tsFilePath": "mcp-server/src/ontology-query.ts",
-      "registeredAt": "2026-06-30T07:07:55.801Z"
+      "registeredAt": "2026-06-30T10:26:04.344Z"
+    },
+    {
+      "name": "OntologyTopology",
+      "description": "Topology summary for the ontology snapshot (v2.0.4). Fields: moduleCount, rpcEndpoints, entityCount, flowEdgeCount, crossServiceRefs. Pure JSON aggregation from entities.json/flow.json/arch-index. O(1) computation, no vector/LLM dependency. Each count is 0 when source file is missing (0 is valid). Entire field omitted only on total computation failure. Surfaced in query_ontology().topology.",
+      "tsFilePath": "mcp-server/src/ontology/types.ts",
+      "registeredAt": "2026-06-30T10:25:58.042Z"
+    },
+    {
+      "name": "ScannerPlugin",
+      "description": "Scanner plugin registry interface (v2.0.4). ScannerPlugin{name, phase:\"entity\"|\"flow\"|\"asset\", scan(ctx)->ScannerResult}. createScannerRegistry() returns 4 plugins: entity-jpa, entity-mybatis, entity-sql (entity phase), flow-derive (flow phase). Pipeline.ts uses registry traversal instead of hardcoded scanner calls, enabling future multi-language plugins in 2.1.",
+      "tsFilePath": "arch-engine/src/scanners/registry.ts",
+      "registeredAt": "2026-06-30T10:25:58.123Z"
+    },
+    {
+      "name": "scanJpaEntitiesAst",
+      "description": "Java AST entity scanner using java-parser CST (v2.0.4). scanJpaEntitiesAst(projectRoot, modules) -> {entities: EntityDef[], relations: EntityRelation[]}. Parses each @Entity Java file via java-parser Chevrotain CST visitor, precisely extracting @Table name, @Column(name/nullable), @OneToMany(mappedBy) and other relation annotations, generic field types (List<OrderItem>). Per-file try/catch falls back to regex for unparseable files. Called by entity-jpa.ts dispatcher as the main path; entity-jpa-regex.ts is the fallback.",
+      "tsFilePath": "arch-engine/src/scanners/entity-jpa-ast.ts",
+      "registeredAt": "2026-06-30T10:25:58.195Z"
+    },
+    {
+      "name": "createScannerRegistry",
+      "description": "Factory for the scanner plugin registry (v2.0.4). Returns ScannerPlugin[] with 4 plugins across 2 phases: entity phase (entity-jpa via AST dispatcher, entity-mybatis, entity-sql) and flow phase (flow-derive via deriveFlowGraph with RPC Step 4). Entity merge (mergeEntityGraphs) happens in pipeline after entity phase, not as a plugin. Registry traversal replaces hardcoded scanner calls in pipeline.ts runStartInit.",
+      "tsFilePath": "arch-engine/src/scanners/registry.ts",
+      "registeredAt": "2026-06-30T10:25:58.260Z"
     }
   ],
   "missingRequests": []
