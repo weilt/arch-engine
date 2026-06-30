@@ -1,4 +1,11 @@
-export type ArchNodeKind = "root" | "module" | "api-doc" | "component-doc" | "package";
+export type ArchNodeKind =
+  | "root"
+  | "module"
+  | "api-doc"
+  | "component-doc"
+  | "package"
+  | "entity-doc"
+  | "flow-doc";
 
 export interface ApiEndpoint {
   id: string;
@@ -91,6 +98,75 @@ export interface DocumentModel {
   packages: FrontendPackage[];
   /** Backend AssetCards written to utils/enums/pojo md (optional, SA-1+). */
   assetCards?: AssetCard[];
+  /** Entity graph (JPA/MyBatis/SQL) for v2.0.3 entity layer. */
+  entities?: EntityGraph;
+  /** Flow graph across backend/frontend layers for v2.0.3 flow layer. */
+  flows?: FlowGraph;
+}
+
+export interface EntityField {
+  name: string;
+  type: string;
+  column?: string;
+  nullable?: boolean;
+}
+
+export interface EntityDef {
+  name: string;
+  table: string;
+  moduleSlug: string;
+  filePath: string;
+  fields: EntityField[];
+  source: "jpa" | "mybatis" | "sql";
+}
+
+export type EntityRelationKind =
+  | "one-to-many"
+  | "many-to-one"
+  | "one-to-one"
+  | "many-to-many"
+  | "fk-reference";
+
+export interface EntityRelation {
+  from: string;
+  to: string;
+  kind: EntityRelationKind;
+  field?: string;
+  source: "jpa" | "mybatis" | "sql";
+}
+
+export interface EntityGraph {
+  entities: EntityDef[];
+  relations: EntityRelation[];
+}
+
+export type FlowLayer =
+  | "entity"
+  | "repository"
+  | "service"
+  | "controller"
+  | "api-client"
+  | "route"
+  | "store";
+
+export interface FlowNode {
+  id: string;
+  layer: FlowLayer;
+  name: string;
+  filePath?: string;
+  moduleSlug?: string;
+}
+
+export interface FlowEdge {
+  from: string;
+  to: string;
+  label?: string;
+  confidence: "high" | "low";
+}
+
+export interface FlowGraph {
+  nodes: FlowNode[];
+  edges: FlowEdge[];
 }
 
 export type AssetKind =
