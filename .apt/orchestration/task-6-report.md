@@ -1,32 +1,74 @@
-# Task 6 Report — /auto-brainstorm 模板改写 + Codex skill
+# Task 6 Report - query_ontology relations field (v2.0.3)
 
-**Status:** `DONE_WITH_CONCERNS`
+## Status
 
-## 交付物（仅白名单两文件）
-- `templates/auto-brainstorm.md` — 改写：~30 行风险分级壳 → 完整 APT 原生 9 步引擎（161 行）。
-- `.agents/skills/apt-auto-brainstorm/SKILL.md` — 新建：body 与模板**一字不差**（node 从模板单一来源派生，frontmatter 改 Codex skill 格式 name/description）。
-- **Commit:** `2d321b9`（git add 仅此两文件，未 -A）。
+**DONE** - implemented, typechecked, tested, and committed.
 
-## 9 步覆盖自检（第 2 步去除，其余全在）
-1 探索上下文(可自主 query_ontology) / 3 澄清提问(可自主 query_ontology(topic)) / 4 提 2-3 方案 / 5 分节确认+Ontology 软提示 / 6 写 spec+「Ontology detection」章节 / **6.5 风险分级** / 7 spec 自检 / 8 用户审(仅 high) / 9 终端接 `/plan-from-spec`。另含 §0 自适应交互模式、§硬规则。
+## Commit
 
-## 风险规则对齐 status/risk.ts（5 条触发 → high）
-frontmatter `risk: high` ｜ `mcp-server`/新增 MCP server/`新 MCP` ｜ `arch-engine`/架构管线(`arch pipeline`/`arch 管线`) ｜ `breaking API`/`新对外契约`/`破坏性 API` ｜ 拟改动 > 8 文件。与 risk.ts 的 HIGH_RISK_KEYWORDS + classifySpecRisk 完全一致。
+- SHA: `5d18ae5976884af21e0d0427634556c32c5f724c`
+- Message: `feat(mcp): query_ontology relations field for v2.0.3`
+- Files changed: 3 files, +175 / -1
 
-## 自适应模式
-默认交互（.apt/goal.md 不存在，high 停等人批）｜全自动（.apt/goal.md 存在，AI 兼扮两角，high 仍设 spec_pending_approval 但不阻塞循环）。
+## Summary
 
-## ⚠️ Concern：Verify-1 superpowers grep 有 2 命中（非真依赖，已定位）
-brief 硬规则原文：「不引用 superpowers：body 内不得出现对 **superpowers skill 的依赖或调用**」。我保留 spec 存储路径 `docs/superpowers/specs/...`（§6），它含字面 superpowers，故 Select-String -Pattern superpowers 命中 2 次（两文件各 1，均在该路径处）。
+Added the v2.0.3 entity `relations` field to the `query_ontology` snapshot.
+`querySnapshot` now reads `.ai/arch/entities.json` (the file written by
+arch-engine's `writeEntityDocs`) and surfaces its `relations` array. Loading is
+fault-tolerant: a missing or corrupt `entities.json` (or an empty relations
+array) omits the field silently, consistent with how every other snapshot
+subfield is computed behind its own try/catch.
 
-**保留理由（实证）：** 该目录是项目真实在用的 spec 存储约定——内含 18 份现存 design spec（含今日 2026-06-29-apt-brainstorm-ontology-design.md），且 /plan-from-spec 从此目录读（其 SKILL.md 示例路径即此）；docs/apt/specs 不存在。单方面改一个模板的输出路径会把新 spec 与 18 份既有 spec 拆到两处、且 plan-from-spec 文档仍指向旧目录，造成管线断裂（真实缺陷）。而存储路径是文件系统位置，非对 skill 的运行时依赖或调用，符合硬规则实质条款。
+## Changes
 
-**真意图已满足：** 精确意图 grep（superpowers: / writing-plans / superpowers skill / brainstorming skill）= **0 命中**；9 步逻辑全内联，终端是 /plan-from-spec，五平台行为一致。
+### `mcp-server/src/ontology/types.ts`
 
-**建议（超出本 Task 白名单）：** 若要 grep 字面归零，正确做法是全仓库把 spec 目录改名 docs/superpowers/specs/ → docs/apt/specs/（含迁移 18 份 spec、同步 plan-from-spec 等多文件），不应在 Task 6 单模板内擅改。
+- Added `EntityRelation` to the existing type-only import from `@apt/arch-engine`.
+- Added `relations?: EntityRelation[]` to `ProjectOntology` (omitted when not built).
 
-## 微闭环
-纯 markdown，无代码 / 无对外 TS 契约 / 无架构资产变更；未跑 audit_arch_changes（按禁令）。
+### `mcp-server/src/ontology-query.ts`
 
-## 回报（主 Agent）
-Task 6 DONE_WITH_CONCERNS。两白名单文件已写并 commit(2d321b9)：9 步引擎完整(除 Visual Companion)、风险规则对齐 risk.ts、自适应模式/硬规则齐备、ontology 注入由 AI 自主、终端 /plan-from-spec、Codex skill body 与模板一字不差。唯一 Concern：verify superpowers grep 命中 2 次，均为既有 spec 存储目录 docs/superpowers/specs/(18 份在用、plan-from-spec 读此处)的路径字面，非 skill 依赖；真意图 grep=0。修法是全仓目录改名(超白名单)，故未擅改。
+- Added `getArchDir` and `type EntityRelation` to the existing `@apt/arch-engine`
+  import block.
+- In `querySnapshot`, after the contracts section, added a guarded block that
+  reads `path.join(getArchDir(projectRoot), "entities.json")`, parses it, and
+  keeps `relations` only when the array is non-empty.
+- Wired `if (relations) ontology.relations = relations;` into the ontology
+  object construction.
+
+### `mcp-server/tests/ontology-query-relations.test.ts` (new)
+
+Three cases using real on-disk tmpdir fixtures (no mocks), following the pattern
+in `ontology-query.test.ts`:
+
+1. relations present - valid `entities.json` with a non-empty `relations` array
+   surfaces the data and keeps the rest of the snapshot intact.
+2. relations omitted (file missing) - no `entities.json`; `relations` is
+   undefined, snapshot still resolves modules/contracts.
+3. relations omitted (file corrupt) - invalid JSON; `relations` is undefined,
+   snapshot still resolves modules/contracts.
+3. relations omitted (file corrupt) - invalid JSON; `relations` is undefined,
+   snapshot still resolves modules/contracts.
+
+## Verification
+
+Both gates required by the task passed:
+
+- **Typecheck**: `node node_modules/typescript/bin/tsc --noEmit` (mcp-server) - 0 errors.
+- **Tests**: `npx vitest run tests/ontology-query-relations.test.ts` - 3/3 passed.
+
+Regression check on the shared handler also passed:
+
+- `npx vitest run tests/ontology-query.test.ts` - 5/5 passed (no regression in
+  `querySnapshot`).
+
+Note: `arch-engine` dist was rebuilt (`tsc`) before the mcp-server typecheck so
+the `EntityRelation` / `getArchDir` exports resolve from `@apt/arch-engine`.
+The arch-engine rebuild is not part of this commit (dist is build output).
+
+## Notes
+
+- The `relations` field is intentionally omitted (not `[]`) when there is
+  nothing to report, matching the existing optional-field convention.
+- Only the three whitelisted files were staged and committed; unrelated working
+  tree changes (other reports, plan doc, scratch script) were left untouched.

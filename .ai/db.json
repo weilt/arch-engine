@@ -65,6 +65,30 @@
       "description": "Return contract of the manually-declared project metadata surfaced in the ontology snapshot. Fields: name? (project display name), techStack?[] (declared technology-stack tags). Authored in arch.config.json under projectMeta and consumed by ontology-query.ts and the query_ontology MCP tool.",
       "tsFilePath": "mcp-server/src/ontology/types.ts",
       "registeredAt": "2026-06-30T02:06:11.648Z"
+    },
+    {
+      "name": "EntityGraph",
+      "description": "Entity graph extracted from JPA annotations, MyBatis XML mappers, and SQL DDL. Contains EntityDef[] (entities with fields/table/source) and EntityRelation[] (one-to-many, many-to-one, etc). Produced by mergeEntityGraphs from three scanners, persisted to .ai/arch/entities.json, surfaced in query_ontology.relations.",
+      "tsFilePath": "arch-engine/src/types.ts",
+      "registeredAt": "2026-06-30T06:57:12.963Z"
+    },
+    {
+      "name": "FlowGraph",
+      "description": "Data flow graph across backend/frontend layers. Contains FlowNode[] (entity/repository/service/controller/api-client/route/store) and FlowEdge[] (directed edges with confidence high/low). Produced by deriveFlowGraph via batch regex cross-layer type-name matching, persisted to .ai/arch/flow.json, queried by query_impact MCP tool.",
+      "tsFilePath": "arch-engine/src/types.ts",
+      "registeredAt": "2026-06-30T06:57:13.030Z"
+    },
+    {
+      "name": "handleQueryImpact",
+      "description": "HandleQueryImpact MCP tool (v2.0.3 18th tool): queries what layers reference a given entity. Reads flow.json and entities.json, groups connected FlowNodes by layer (entity→repository→service→controller→api-client→route→store), sorts high-confidence before low. Three-level degradation: missing flow.json, corrupt JSON, entity not found — each returns note field. Never returns isError.",
+      "tsFilePath": "mcp-server/src/impact-query.ts",
+      "registeredAt": "2026-06-30T06:58:04.647Z"
+    },
+    {
+      "name": "handleQueryOntology",
+      "description": "Core handler for the query_ontology MCP tool (v2.0.2 17th tool, updated in v2.0.3). Two modes: (1) no-arg snapshot returns ProjectOntology (project from projectMeta, status from aggregateStatus read-only, progress?, modules/packages from markdown header counts, contracts from db.json, design? when design layer detected, approvalState?, relations? from entities.json when entity layer exists); (2) topic focus returns OntologyTopicResult (assets via search_arch, contracts by name match, designPages by slug match). v2.0.3 adds relations field loaded from .ai/arch/entities.json behind try/catch — silent omit when missing or corrupt.",
+      "tsFilePath": "mcp-server/src/ontology-query.ts",
+      "registeredAt": "2026-06-30T07:07:55.801Z"
     }
   ],
   "missingRequests": []

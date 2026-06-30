@@ -2,7 +2,7 @@
 
 > **Spec:** `docs/superpowers/specs/2026-06-30-apt-entity-flow-design.md`
 > **Command:** `/plan-from-spec`
-> **Status:** draft
+> **Status:** approved
 
 **Goal:** 为项目本体图增加实体层（entity）与数据流层（flow），使 AI 能查询实体关系与数据流向，并支持 query_impact 变更影响分析。
 
