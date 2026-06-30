@@ -38,6 +38,8 @@ import type {
   ArchChunk,
   ArchConfig,
   AssetCard,
+  CallGraphEdge,
+  CallGraphNode,
   EntityDef,
   EntityRelation,
   FrontendPackage,
@@ -64,6 +66,7 @@ import {
 import { writeModuleAssetDocs } from "./writer/asset-md.js";
 import { writeEntityDocs } from "./writer/entity-md.js";
 import { writeFlowDocs } from "./writer/flow-md.js";
+import { writeCallGraph } from "./writer/call-graph.js";
 import { buildDesignArchAlignment } from "./design/alignment.js";
 import { getDesignProfilePath } from "./design/paths.js";
 
@@ -515,6 +518,37 @@ export async function runStartInit(
     ? await resolveFrontendPackageDirs(projectRoot, config.frontendPackages)
     : new Map<string, string>();
 
+  // v2.0.5: Call graph scanning via registry. Runs after packageDirs is
+  // resolved because the frontend plugin needs it. The registry/ctx here are
+  // the same shape as the entity/flow phase above; a fresh registry is used
+  // since the earlier one is scoped inside the `config.scanners.java` block.
+  {
+    const registry = createScannerRegistry();
+    const ctx: ScannerContext = { projectRoot, modules, model };
+    const callCtx: ScannerContext = { ...ctx, packageDirs, packages: model.packages };
+    for (const plugin of registry) {
+      if (plugin.phase !== "call-graph") continue;
+      try {
+        const result = await plugin.scan(callCtx);
+        if (result.callGraph?.nodes && result.callGraph.nodes.length > 0) {
+          if (!model.callGraph) {
+            model.callGraph = { nodes: [], edges: [] };
+          }
+          model.callGraph.nodes.push(...result.callGraph.nodes);
+          model.callGraph.edges.push(...result.callGraph.edges);
+          archLog.info(`start-init: ${plugin.name} complete`, {
+            nodes: result.callGraph.nodes.length,
+            edges: result.callGraph.edges.length,
+          });
+        }
+      } catch (e) {
+        archLog.warn(`start-init: ${plugin.name} failed (non-fatal)`, {
+          error: e instanceof Error ? e.message : String(e),
+        });
+      }
+    }
+  }
+
   if (incremental && previousScan) {
     try {
       const changed = getChangedFilesSince(projectRoot, previousScan.commit);
@@ -699,6 +733,15 @@ export async function runStartInit(
       await writeFlowDocs(projectRoot, model.flows);
     } catch (e) {
       archLog.warn("start-init: flow doc write failed", {
+        error: e instanceof Error ? e.message : String(e),
+      });
+    }
+  }
+  if (model.callGraph) {
+    try {
+      await writeCallGraph(projectRoot, model.callGraph);
+    } catch (e) {
+      archLog.warn("start-init: call-graph doc write failed", {
         error: e instanceof Error ? e.message : String(e),
       });
     }
