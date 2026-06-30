@@ -217,5 +217,90 @@ export async function deriveFlowGraph(
     }
   }
 
+  // Step 4: Feign RPC cross-service edges.
+  // Only proceed when there are RPC endpoints to match against. Any failure
+  // here must not discard the Steps 1-3 results already collected.
+  try {
+    if (model.rpcs.length > 0) {
+      const rpcNames = new Set(model.rpcs.map((r) => r.name));
+
+      // Re-scan backend service/controller source files for @Autowired Feign
+      // clients. Steps 1-3 only tested entity names, so a fresh read is needed
+      // to match injected Feign interface types.
+      for (const module of model.modules) {
+        const moduleDir = path.join(projectRoot, module.path);
+        let javaFiles: string[] = [];
+        try {
+          javaFiles = await fg.glob("**/*.java", {
+            cwd: moduleDir,
+            absolute: true,
+            ignore: ["**/target/**"],
+          });
+        } catch {
+          continue;
+        }
+
+        for (const absFile of javaFiles) {
+          const layer = detectBackendLayer(absFile);
+          if (layer !== "service" && layer !== "controller") continue;
+
+          let content: string;
+          try {
+            content = await fs.readFile(absFile, "utf-8");
+          } catch {
+            continue;
+          }
+
+          const className = extractClassName(content, absFile);
+          const callerNodeId = `${layer}:${className}`;
+
+          // Detect @Autowired fields with Feign client types.
+          // Pattern: @Autowired private SomeClient fieldName;
+          // The field type must match a name present in model.rpcs.
+          const autowiredFieldRe =
+            /@Autowired\s+(?:private\s+|protected\s+)?([A-Za-z_]\w*)\s+\w+\s*;/g;
+          for (const m of content.matchAll(autowiredFieldRe)) {
+            const feignType = m[1];
+            if (!rpcNames.has(feignType)) continue;
+
+            // Create the RPC node.
+            const rpcNodeId = `rpc:${feignType}`;
+            addNode({
+              id: rpcNodeId,
+              layer: "rpc",
+              name: feignType,
+              moduleSlug: module.slug,
+            });
+
+            // Edge: caller service/controller -> rpc node.
+            addEdge(callerNodeId, rpcNodeId, "high", "rpc");
+
+            // Edge: rpc node -> target service (best-effort). We look for a
+            // service whose name matches the client's base name (e.g.
+            // UserClient -> UserService). If nothing matches, the rpc node
+            // stays dangling (only the caller->rpc edge exists).
+            const baseName = feignType
+              .replace(/Client$/, "")
+              .replace(/FeignClient$/, "")
+              .replace(/Feign$/, "");
+            const targetCandidates = [
+              `service:${baseName}Service`,
+              `service:${baseName}ServiceImpl`,
+              `service:${baseName}`,
+            ];
+            for (const target of targetCandidates) {
+              if (nodes.has(target)) {
+                addEdge(rpcNodeId, target, "high", "rpc");
+                break;
+              }
+            }
+          }
+        }
+      }
+    }
+  } catch {
+    // RPC edge derivation failed — flow graph still returns Steps 1-3 results.
+  }
+
   return { nodes: [...nodes.values()], edges };
 }
