@@ -70,6 +70,9 @@ type TopicResult = {
   matchedIn: string[];
   entities?: string[];
   flowSummary?: { nodes: number; edges: number };
+  // v2.0.5: call-graph method/DTO drill-down (omitted when not computed).
+  methods?: number;
+  dtos?: number;
 };
 
 async function topic(root: string, t: string): Promise<TopicResult> {
@@ -110,9 +113,12 @@ describe("queryTopic drill-down", () => {
     });
 
     const result = await topic(root, "orders");
-    expect(result.entities).toEqual(["Order", "OrderItem"]);
-    expect(result.flowSummary).toEqual({ nodes: 2, edges: 2 });
-    expect(result.matchedIn).toContain("ontology");
+   expect(result.entities).toEqual(["Order", "OrderItem"]);
+   expect(result.flowSummary).toEqual({ nodes: 2, edges: 2 });
+   expect(result.matchedIn).toContain("ontology");
+    // v2.0.5: no call-graph.json in this fixture -> methods/dtos omitted.
+    expect(result.methods).toBeUndefined();
+    expect(result.dtos).toBeUndefined();
   });
 
   it("omits entities/flowSummary when the topic matches no module slug", async () => {
@@ -146,7 +152,29 @@ describe("queryTopic drill-down", () => {
     });
 
     const result = await topic(root, "orders");
-    expect(result.entities).toBeUndefined();
-    expect(result.flowSummary).toEqual({ nodes: 1, edges: 1 });
+   expect(result.entities).toBeUndefined();
+   expect(result.flowSummary).toEqual({ nodes: 1, edges: 1 });
+  });
+  it("surfaces methods/dtos from call-graph.json for a matched module slug", async () => {
+    await writeBaseFixture(root);
+    await writeFiles(root, {
+      ".ai/arch/call-graph.json": JSON.stringify({
+        nodes: [
+          { id: "method:OrderService#create", kind: "method", name: "create", moduleSlug: "orders" },
+          { id: "method:OrderService#findById", kind: "method", name: "findById", moduleSlug: "orders" },
+          // Frontend component shares kind "method" but a "component:" id -> excluded.
+          { id: "component:OrderList", kind: "method", name: "OrderList", moduleSlug: "orders" },
+          { id: "dto:OrderDTO", kind: "dto", name: "OrderDTO", moduleSlug: "orders" },
+          { id: "dto:InvoiceDTO", kind: "dto", name: "InvoiceDTO", moduleSlug: "billing" },
+          { id: "method:InvoiceService#total", kind: "method", name: "total", moduleSlug: "billing" },
+        ],
+        edges: [],
+      }),
+    });
+    const result = await topic(root, "orders");
+    // 2 real method nodes; the component:OrderList node is excluded by id prefix.
+    expect(result.methods).toBe(2);
+    expect(result.dtos).toBe(1);
+    expect(result.matchedIn).toContain("ontology");
   });
 });
