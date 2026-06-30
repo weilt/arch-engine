@@ -2,9 +2,9 @@
 title: APT v2.0.4 Ontology Drill + AST Entity + RPC Flow
 version: 2.0.4
 date: 2026-06-30
-status: draft
+status: approved
 risk: high
-phase: spec_pending_approval
+phase: approved
 ---
 
 ## Goal
