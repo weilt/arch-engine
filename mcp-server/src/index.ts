@@ -19,6 +19,7 @@ import { handleRegisterUiPattern } from "./design-register.js";
 import { handleAuditDesignChanges } from "./design-audit.js";
 import { handleQueryProjectStatus } from "./status/aggregate.js";
 import { handleQueryOntology } from "./ontology-query.js";
+import { handleQueryImpact } from "./impact-query.js";
 
 const projectRoot = getProjectRoot();
 
@@ -529,6 +530,25 @@ server.tool(
   async ({ topic }) => {
     try {
       const result = await handleQueryOntology(projectRoot, topic);
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+      };
+    } catch (err) {
+      return {
+        content: [{ type: "text" as const, text: String(err) }],
+        isError: true,
+      };
+    }
+  }
+);
+
+server.tool(
+  "query_impact",
+  "Query what layers reference a given entity (repository/service/controller/frontend). Read-only impact analysis for change-scoping.",
+  { entity: z.string().describe("Entity class name, e.g. Order") },
+  async ({ entity }) => {
+    try {
+      const result = await handleQueryImpact(projectRoot, entity);
       return {
         content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
       };
