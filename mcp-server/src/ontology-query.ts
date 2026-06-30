@@ -21,6 +21,7 @@ import type {
   OntologyContract,
   ModuleOntology,
   PackageOntology,
+  OntologyTopology,
 } from "./ontology/types.js";
 import {
   loadOrInitConfig,
@@ -155,7 +156,82 @@ async function querySnapshot(
   if (design) ontology.design = design;
   if (approvalState) ontology.approvalState = approvalState;
   if (relations) ontology.relations = relations;
+  // v2.0.4: structural topology metrics (entities/flow). Omitted only when the
+  // whole computation fails; zero counts are valid and kept.
+  const topology = await deriveTopology(projectRoot, modules);
+  if (topology) ontology.topology = topology;
   return ontology;
+}
+
+// v2.0.4: structural topology metrics for the snapshot. Each source (entities,
+// flow) is behind its own try/catch so a missing or corrupt file yields a zero
+// count rather than omitting the whole topology; only a total failure returns
+// undefined. moduleCount comes from the already-computed modules list.
+async function deriveTopology(
+  projectRoot: string,
+  modules: ModuleOntology[]
+): Promise<OntologyTopology | undefined> {
+  try {
+    const archDir = getArchDir(projectRoot);
+    const moduleCount = modules.length;
+
+    // entityCount: entities.json; missing/corrupt -> 0 (a valid value).
+    let entityCount = 0;
+    try {
+      const entitiesRaw = await fs.readFile(
+        path.join(archDir, "entities.json"),
+        "utf-8"
+      );
+      const entitiesParsed = JSON.parse(entitiesRaw) as {
+        entities?: unknown[];
+      };
+      entityCount = Array.isArray(entitiesParsed.entities)
+        ? entitiesParsed.entities.length
+        : 0;
+    } catch {
+      entityCount = 0;
+    }
+
+    // flowEdgeCount / rpcEndpoints / crossServiceRefs: flow.json; missing/corrupt
+    // -> all stay 0. rpcEndpoints counts rpc-layer nodes; crossServiceRefs
+    // counts edges that touch an rpc node (ids are prefixed "rpc:").
+    let flowEdgeCount = 0;
+    let rpcEndpoints = 0;
+    let crossServiceRefs = 0;
+    try {
+      const flowRaw = await fs.readFile(path.join(archDir, "flow.json"), "utf-8");
+      const flowParsed = JSON.parse(flowRaw) as {
+        nodes?: { layer?: string }[];
+        edges?: { from?: string; to?: string }[];
+      };
+      flowEdgeCount = Array.isArray(flowParsed.edges)
+        ? flowParsed.edges.length
+        : 0;
+      const rpcNodes = Array.isArray(flowParsed.nodes)
+        ? flowParsed.nodes.filter((n) => n?.layer === "rpc")
+        : [];
+      rpcEndpoints = rpcNodes.length;
+      if (Array.isArray(flowParsed.edges)) {
+        crossServiceRefs = flowParsed.edges.filter(
+          (e) =>
+            e?.from?.startsWith("rpc:") || e?.to?.startsWith("rpc:")
+        ).length;
+      }
+    } catch {
+      // flow.json missing or corrupt: all flow counts stay 0.
+    }
+
+    return {
+      moduleCount,
+      rpcEndpoints,
+      entityCount,
+      flowEdgeCount,
+      crossServiceRefs,
+    };
+  } catch {
+    // Overall failure: omit topology entirely.
+    return undefined;
+  }
 }
 
 // progress requires real tasks; an empty/missing ledger omits the field rather
@@ -239,10 +315,54 @@ async function queryTopic(
     );
   }
 
+  // v2.0.4: Entity + flow drill-down. When the topic matches a module slug,
+  // surface that module's entity names and a flow node/edge summary. Missing
+  // or corrupt entities.json/flow.json omits the fields silently.
+  const archDir = getArchDir(projectRoot);
+  let entities: string[] | undefined;
+  let flowSummary: { nodes: number; edges: number } | undefined;
+  try {
+    const entitiesRaw = await fs.readFile(
+      path.join(archDir, "entities.json"),
+      "utf-8"
+    );
+    const entitiesParsed = JSON.parse(entitiesRaw) as {
+      entities?: { moduleSlug?: string; name?: string }[];
+    };
+    const moduleEntities = (entitiesParsed.entities ?? [])
+      .filter((e) => e?.moduleSlug?.toLowerCase() === topicLower)
+      .map((e) => e.name)
+      .filter((n): n is string => typeof n === "string");
+    if (moduleEntities.length > 0) {
+      entities = moduleEntities;
+    }
+  } catch {
+    // entities.json missing/corrupt: entities omitted silently.
+  }
+  try {
+    const flowRaw = await fs.readFile(path.join(archDir, "flow.json"), "utf-8");
+    const flowParsed = JSON.parse(flowRaw) as {
+      nodes?: { moduleSlug?: string }[];
+      edges?: unknown[];
+    };
+    const moduleNodes = (flowParsed.nodes ?? []).filter(
+      (n) => n?.moduleSlug?.toLowerCase() === topicLower
+    );
+    if (moduleNodes.length > 0) {
+      flowSummary = {
+        nodes: moduleNodes.length,
+        edges: flowParsed.edges?.length ?? 0,
+      };
+    }
+  } catch {
+    // flow.json missing/corrupt: flowSummary omitted silently.
+  }
+
   const matchedIn: string[] = [];
   if (assets.length > 0) matchedIn.push("architecture");
   if (contracts.length > 0) matchedIn.push("contracts");
   if (designPages && designPages.length > 0) matchedIn.push("design");
+  if (entities || flowSummary) matchedIn.push("ontology");
 
   const result: OntologyTopicResult = {
     topic,
@@ -251,6 +371,8 @@ async function queryTopic(
     contracts,
   };
   if (designPages) result.designPages = designPages;
+  if (entities) result.entities = entities;
+  if (flowSummary) result.flowSummary = flowSummary;
   return result;
 }
 
