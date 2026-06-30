@@ -2,7 +2,7 @@
 
 > **Spec:** `docs/superpowers/specs/2026-06-30-call-graph-impact-design.md`
 > **Command:** `/plan-from-spec`
-> **Status:** draft
+> **Status:** approved
 
 **Goal:** 补全方法级调用图、DTO/VO 类型跟踪、运行时行为注解、前端组件 import 图,使 query_impact 从"实体影响哪些层"升级到"改方法/DTO/组件谁会断";并修复 refresh_asset 对 TS 源码推断失败的操作 bug。
 
