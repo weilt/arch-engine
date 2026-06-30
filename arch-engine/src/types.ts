@@ -102,6 +102,8 @@ export interface DocumentModel {
   entities?: EntityGraph;
   /** Flow graph across backend/frontend layers for v2.0.3 flow layer. */
   flows?: FlowGraph;
+  /** Call graph (method/dto) for v2.0.5 call layer. */
+  callGraph?: CallGraph;
 }
 
 export interface EntityField {
@@ -168,6 +170,34 @@ export interface FlowEdge {
 export interface FlowGraph {
   nodes: FlowNode[];
   edges: FlowEdge[];
+}
+
+export type CallGraphNodeKind = "method" | "dto";
+
+export interface CallGraphNode {
+  id: string;
+  kind: CallGraphNodeKind;
+  name: string;
+  filePath?: string;
+  moduleSlug?: string;
+  layer?: FlowLayer;
+  fields?: { name: string; type: string }[];
+  annotations?: string[];
+  signature?: string;
+}
+
+export type CallGraphEdgeKind = "calls" | "imports" | "uses" | "template";
+
+export interface CallGraphEdge {
+  from: string;
+  to: string;
+  kind: CallGraphEdgeKind;
+  confidence: "high" | "low";
+}
+
+export interface CallGraph {
+  nodes: CallGraphNode[];
+  edges: CallGraphEdge[];
 }
 
 export type AssetKind =

@@ -20,6 +20,13 @@ export type {
   FlowEdge,
   FlowLayer,
 } from "./types.js";
+export type {
+  CallGraph,
+  CallGraphNode,
+  CallGraphNodeKind,
+  CallGraphEdge,
+  CallGraphEdgeKind,
+} from "./types.js";
 
 export {
   getArchDir,
