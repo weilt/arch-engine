@@ -2,7 +2,7 @@
 
 > **Spec:** docs/superpowers/specs/2026-06-30-apt-v204-enhancement-design.md
 > **Command:** /plan-from-spec
-> **Status:** draft
+> **Status:** approved
 
 **Goal:** arch-engine entity graph on large Java backend: topology drill + AST entity + RPC flow + scanner registry.
 
