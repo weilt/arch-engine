@@ -28,7 +28,9 @@ import {
   getDesignDir,
   getDesignProfilePath,
   getFrameworkBindingsPath,
+  getArchDir,
   type SearchHit,
+  type EntityRelation,
 } from "@apt/arch-engine";
 
 const PROGRESS_REL = path.join(".apt", "orchestration", "progress.md");
@@ -129,6 +131,19 @@ async function querySnapshot(
   const design = await readDesignInfo(projectRoot);
   const approvalState = deriveApprovalState(st);
 
+  // v2.0.3: relations from entities.json (silent omit on failure)
+  let relations: EntityRelation[] | undefined;
+  try {
+    const entitiesJsonPath = path.join(getArchDir(projectRoot), "entities.json");
+    const raw = await fs.readFile(entitiesJsonPath, "utf-8");
+    const parsed = JSON.parse(raw) as { relations?: EntityRelation[] };
+    if (parsed.relations && parsed.relations.length > 0) {
+      relations = parsed.relations;
+    }
+  } catch {
+    // entities.json missing or corrupt — relations field omitted silently
+  }
+
   const ontology: ProjectOntology = {
     project,
     status,
@@ -139,6 +154,7 @@ async function querySnapshot(
   if (progress) ontology.progress = progress;
   if (design) ontology.design = design;
   if (approvalState) ontology.approvalState = approvalState;
+  if (relations) ontology.relations = relations;
   return ontology;
 }
 

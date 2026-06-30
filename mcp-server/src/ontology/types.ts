@@ -9,7 +9,7 @@ import type {
   SpecRisk,
   ApprovalState,
 } from "../status/types.js";
-import type { SearchHit } from "@apt/arch-engine";
+import type { SearchHit, EntityRelation } from "@apt/arch-engine";
 
 // Lightweight project metadata surfaced in the ontology snapshot.
 export interface ProjectMeta {
@@ -92,6 +92,8 @@ export interface ProjectOntology {
   contracts: OntologyContract[];
   design?: OntologyDesign;
   approvalState?: OntologyApprovalState;
+  /** v2.0.3: Entity relations from entities.json (omitted when not built). */
+  relations?: EntityRelation[];
 }
 
 // Result of looking up a single topic across the project ontology.
