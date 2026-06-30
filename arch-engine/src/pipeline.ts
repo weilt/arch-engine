@@ -32,15 +32,14 @@ import {
 import { resolveJavaPathRules } from "./scanners/java-path-rules.js";
 import { mergeDocumentModel } from "./scanners/merge.js";
 import { scanOpenApiGlobs } from "./scanners/openapi.js";
-import { scanJpaEntities } from "./scanners/entity-jpa.js";
-import { scanMybatisEntities } from "./scanners/entity-mybatis.js";
-import { scanSqlEntities } from "./scanners/entity-sql.js";
 import { mergeEntityGraphs } from "./scanners/entity-merge.js";
-import { deriveFlowGraph } from "./scanners/flow-scanner.js";
+import { createScannerRegistry, type ScannerContext } from "./scanners/registry.js";
 import type {
   ArchChunk,
   ArchConfig,
   AssetCard,
+  EntityDef,
+  EntityRelation,
   FrontendPackage,
   JavaModule,
   LastScanState,
@@ -433,14 +432,38 @@ export async function runStartInit(
     incremental,
   });
 
-  // v2.0.3: Entity layer scanning (JPA + MyBatis + SQL)
+  // v2.0.4: Entity + Flow scanning via Scanner Registry
   const entityNames = new Set<string>();
   if (config.scanners.java) {
+    const registry = createScannerRegistry();
+    const ctx: ScannerContext = { projectRoot, modules, model };
+
+    // Entity phase: collect results from all entity-phase plugins
+    const entityResults: Record<string, { entities: EntityDef[]; relations: EntityRelation[] }> = {};
+    for (const plugin of registry) {
+      if (plugin.phase !== "entity") continue;
+      try {
+        const result = await plugin.scan(ctx);
+        if (result.entities?.entities) {
+          entityResults[plugin.name] = {
+            entities: result.entities.entities,
+            relations: result.entities.relations ?? [],
+          };
+        }
+      } catch (e) {
+        archLog.warn(`start-init: ${plugin.name} failed (non-fatal)`, {
+          error: e instanceof Error ? e.message : String(e),
+        });
+      }
+    }
+
+    // Merge entity graphs (JPA > MyBatis > SQL)
     try {
-      const jpa = await scanJpaEntities(projectRoot, modules);
-      const mybatis = await scanMybatisEntities(projectRoot, modules);
-      const sql = await scanSqlEntities(projectRoot);
-      const merged = mergeEntityGraphs(jpa, mybatis, sql);
+      const merged = mergeEntityGraphs(
+        entityResults["entity-jpa"] ?? { entities: [], relations: [] },
+        entityResults["entity-mybatis"] ?? { entities: [], relations: [] },
+        entityResults["entity-sql"] ?? { entities: [], relations: [] },
+      );
       if (merged.entities.length > 0) {
         model.entities = merged;
         for (const e of merged.entities) entityNames.add(e.name);
@@ -450,27 +473,34 @@ export async function runStartInit(
         });
       }
     } catch (e) {
-      archLog.warn("start-init: entity scan failed (non-fatal)", {
+      archLog.warn("start-init: entity merge failed (non-fatal)", {
         error: e instanceof Error ? e.message : String(e),
       });
     }
-  }
 
-  // v2.0.3: Flow layer derivation (only when entities exist)
-  if (entityNames.size > 0) {
-    try {
-      const flows = await deriveFlowGraph(projectRoot, [...entityNames], model);
-      if (flows.nodes.length > 0) {
-        model.flows = flows;
-        archLog.info("start-init: flow derivation complete", {
-          nodes: flows.nodes.length,
-          edges: flows.edges.length,
-        });
+    // Flow phase: run flow-phase plugins with entityNames populated
+    if (entityNames.size > 0) {
+      const flowCtx: ScannerContext = { ...ctx, entityNames: [...entityNames] };
+      for (const plugin of registry) {
+        if (plugin.phase !== "flow") continue;
+        try {
+          const result = await plugin.scan(flowCtx);
+          if (result.flows?.nodes && result.flows.nodes.length > 0) {
+            model.flows = {
+              nodes: result.flows.nodes,
+              edges: result.flows.edges ?? [],
+            };
+            archLog.info(`start-init: ${plugin.name} complete`, {
+              nodes: model.flows.nodes.length,
+              edges: model.flows.edges.length,
+            });
+          }
+        } catch (e) {
+          archLog.warn(`start-init: ${plugin.name} failed (non-fatal)`, {
+            error: e instanceof Error ? e.message : String(e),
+          });
+        }
       }
-    } catch (e) {
-      archLog.warn("start-init: flow derivation failed (non-fatal)", {
-        error: e instanceof Error ? e.message : String(e),
-      });
     }
   }
 

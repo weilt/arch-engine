@@ -1,4 +1,8 @@
 import type { DocumentModel, EntityGraph, FlowGraph, JavaModule } from "../types.js";
+import { scanJpaEntities } from "./entity-jpa.js";
+import { scanMybatisEntities } from "./entity-mybatis.js";
+import { scanSqlEntities } from "./entity-sql.js";
+import { deriveFlowGraph } from "./flow-scanner.js";
 
 export type ScannerPhase = "entity" | "flow" | "asset";
 
@@ -20,7 +24,46 @@ export interface ScannerPlugin {
   scan(ctx: ScannerContext): Promise<ScannerResult>;
 }
 
-// Empty stub - will be filled in Task 4
 export function createScannerRegistry(): ScannerPlugin[] {
-  return [];
+  return [
+    // Entity phase: JPA scanner
+    {
+      name: "entity-jpa",
+      phase: "entity",
+      async scan(ctx) {
+        const result = await scanJpaEntities(ctx.projectRoot, ctx.modules);
+        return { entities: result };
+      },
+    },
+    // Entity phase: MyBatis scanner
+    {
+      name: "entity-mybatis",
+      phase: "entity",
+      async scan(ctx) {
+        const result = await scanMybatisEntities(ctx.projectRoot, ctx.modules);
+        return { entities: result };
+      },
+    },
+    // Entity phase: SQL scanner
+    {
+      name: "entity-sql",
+      phase: "entity",
+      async scan(ctx) {
+        const result = await scanSqlEntities(ctx.projectRoot);
+        return { entities: result };
+      },
+    },
+    // Flow phase: flow graph derivation (depends on entityNames from entity phase)
+    {
+      name: "flow-derive",
+      phase: "flow",
+      async scan(ctx) {
+        if (!ctx.entityNames || ctx.entityNames.length === 0) {
+          return {};
+        }
+        const flows = await deriveFlowGraph(ctx.projectRoot, ctx.entityNames, ctx.model);
+        return { flows };
+      },
+    },
+  ];
 }
