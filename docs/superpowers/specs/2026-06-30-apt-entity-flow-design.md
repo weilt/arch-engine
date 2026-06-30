@@ -2,9 +2,9 @@
 title: APT Entity & Flow Ontology Layer
 version: 2.0.3
 date: 2026-06-30
-status: draft
+status: approved
 risk: high
-phase: spec_pending_approval
+phase: approved
 ---
 
 ## Goal
