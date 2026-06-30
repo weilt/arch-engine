@@ -82,6 +82,15 @@ export interface OntologyStatus {
   activeGoal?: string;
 }
 
+// Structural topology metrics surfaced in the ontology snapshot (v2.0.4).
+export interface OntologyTopology {
+  moduleCount: number;
+  rpcEndpoints: number;
+  entityCount: number;
+  flowEdgeCount: number;
+  crossServiceRefs: number;
+}
+
 // Full project ontology snapshot (spec section 3.2).
 export interface ProjectOntology {
   project: ProjectMeta | null;
@@ -94,6 +103,8 @@ export interface ProjectOntology {
   approvalState?: OntologyApprovalState;
   /** v2.0.3: Entity relations from entities.json (omitted when not built). */
   relations?: EntityRelation[];
+  /** v2.0.4: structural topology metrics (omitted when not computed). */
+  topology?: OntologyTopology;
 }
 
 // Result of looking up a single topic across the project ontology.
@@ -103,4 +114,6 @@ export interface OntologyTopicResult {
   assets: SearchHit[];
   contracts: OntologyContract[];
   designPages?: string[];
+  entities?: string[];
+  flowSummary?: { nodes: number; edges: number };
 }

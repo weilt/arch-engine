@@ -147,7 +147,8 @@ export type FlowLayer =
   | "controller"
   | "api-client"
   | "route"
-  | "store";
+  | "store"
+  | "rpc";
 
 export interface FlowNode {
   id: string;

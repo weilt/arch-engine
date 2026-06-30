@@ -30,6 +30,7 @@ const LAYER_ORDER = [
   "repository",
   "service",
   "controller",
+  "rpc",
   "api-client",
   "route",
   "store",
