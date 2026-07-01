@@ -27,6 +27,14 @@ const javaModuleFixture = path.join(fixturesRoot, "java-module");
 async function setupReindexProject(tmpRoot: string): Promise<void> {
   await fs.cp(javaModuleFixture, tmpRoot, { recursive: true });
 
+  // Simulate rules living only in a dependency JAR (no framework sources in workspace).
+  const webConfigDir = path.join(
+    tmpRoot,
+    "src/main/java/com/example/framework/web/config"
+  );
+  await fs.rm(path.join(webConfigDir, "DemoWebAutoConfiguration.java"), { force: true });
+  await fs.rm(path.join(webConfigDir, "WebProperties.java"), { force: true });
+
   const archDir = path.join(tmpRoot, ".ai", "arch");
   await fs.mkdir(archDir, { recursive: true });
 
@@ -148,6 +156,19 @@ describe("runReindexApis", () => {
 
     const apiMd = await fs.readFile(apiPath, "utf-8");
     expect(apiMd).toContain("/admin-api");
+    expect(apiMd).toMatch(/## GET \/admin-api\/demo\/hello/);
+
+    const pathRulesPath = path.join(getArchDir(tmpRoot), "path-rules.json");
+    const pathRules = JSON.parse(await fs.readFile(pathRulesPath, "utf-8")) as {
+      confidence: string;
+      rules: { prefix: string; source: string; controllerPattern: string }[];
+      sources: string[];
+    };
+    expect(pathRules.confidence).toBe("high");
+    const adminRule = pathRules.rules.find((r) => r.prefix === "/admin-api");
+    expect(adminRule?.source).toBe("manual");
+    expect(adminRule?.controllerPattern).toBe("**.controller.admin.**");
+    expect(pathRules.sources).toContain("manual");
 
     const index = JSON.parse(
       await fs.readFile(getArchIndexPath(tmpRoot), "utf-8")
@@ -156,6 +177,6 @@ describe("runReindexApis", () => {
     };
     const apiNode = index.nodes[`backend/${moduleSlug}/api`];
     expect(apiNode?.keywords?.some((k) => k.includes("/admin-api"))).toBe(true);
-    expect(apiNode?.anchors?.length).toBeGreaterThan(0);
+    expect(apiNode?.anchors?.some((a) => a.includes("/admin-api"))).toBe(true);
   });
 });
