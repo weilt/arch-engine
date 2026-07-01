@@ -1,10 +1,71 @@
 #!/usr/bin/env node
+import fs from "node:fs/promises";
 import path from "node:path";
-import { setArchLogVerbose } from "./log.js";
+import { archLog, setArchLogVerbose } from "./log.js";
 import { runStartInit } from "./pipeline.js";
+import { getArchIndexPath } from "./paths.js";
+import { runReindexApis } from "./reindex/apis.js";
 
-if (process.argv.includes("--verbose") || process.argv.includes("-v")) {
-  setArchLogVerbose(true);
+export interface CliOptions {
+  projectRoot: string;
+  full: boolean;
+  reindexApis: boolean;
+  verbose: boolean;
+}
+
+export function parseCliArgs(argv: string[]): CliOptions {
+  const verbose = argv.includes("--verbose") || argv.includes("-v");
+  const reindexApis = argv.includes("--reindex-apis");
+  const full = argv.includes("--full") && !reindexApis;
+  const positional = argv.filter((a) => !a.startsWith("-"));
+  const projectRoot = positional[0] ? path.resolve(positional[0]) : process.cwd();
+  return { projectRoot, full, reindexApis, verbose };
+}
+
+async function archIndexExists(projectRoot: string): Promise<boolean> {
+  try {
+    await fs.access(getArchIndexPath(projectRoot));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export async function runCli(options: CliOptions): Promise<number> {
+  const { projectRoot, full, reindexApis } = options;
+
+  if (reindexApis) {
+    if (process.argv.includes("--full")) {
+      archLog.warn("--reindex-apis takes precedence over --full");
+    }
+
+    if (!(await archIndexExists(projectRoot))) {
+      console.error(
+        "arch-index.json not found — run start-init first to create the architecture index"
+      );
+      return 2;
+    }
+
+    const report = await runReindexApis(projectRoot);
+    console.log(
+      `✅ reindex-apis complete: ${report.apiCount} APIs, ${report.modulesUpdated} modules updated`
+    );
+    return 0;
+  }
+
+  const report = await runStartInit(projectRoot, {}, { full });
+
+  if (report.status === "config-created") {
+    console.log(
+      "✅ Created arch.config.json — add apiKey in arch.config.json or arch.secrets.json (or set OPENAI_API_KEY), then re-run start-init"
+    );
+    return 0;
+  }
+
+  console.log(
+    `✅ start-init complete: ${report.apiCount} APIs, ${report.moduleCount} modules, ${report.chunkCount} chunks`
+  );
+  return 0;
 }
 
 function isEmbeddingError(message: string): boolean {
@@ -20,27 +81,12 @@ function isConfigError(message: string): boolean {
   return message.includes("JSON") || message.includes("config");
 }
 
-function resolveProjectRoot(): string {
-  const args = process.argv.slice(2).filter((a) => !a.startsWith("-"));
-  return args[0] ? path.resolve(args[0]) : process.cwd();
-}
-
 async function main(): Promise<void> {
-  const root = resolveProjectRoot();
-  const full = process.argv.includes("--full");
-  const report = await runStartInit(root, {}, { full });
-
-  if (report.status === "config-created") {
-    console.log(
-      "✅ Created arch.config.json — add apiKey in arch.config.json or arch.secrets.json (or set OPENAI_API_KEY), then re-run start-init"
-    );
-    process.exit(0);
+  const options = parseCliArgs(process.argv.slice(2));
+  if (options.verbose) {
+    setArchLogVerbose(true);
   }
-
-  console.log(
-    `✅ start-init complete: ${report.apiCount} APIs, ${report.moduleCount} modules, ${report.chunkCount} chunks`
-  );
-  process.exit(0);
+  process.exit(await runCli(options));
 }
 
 main().catch((err: unknown) => {
