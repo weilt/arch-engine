@@ -1,25 +1,33 @@
-# Task 4 Report — entity-md.ts + flow-md.ts writers
+# Task 4 Report — rollup spec 与 plan/feature 模板
 
-## Status
-PASS
+**Status:** DONE  
+**BASE_SHA:** `62b0591`（Task 3）  
+**Plan:** `docs/apt/plans/2026-07-03-apt-2.0.6-page-factory-plan.md`
 
-## Commit
-`453e2c8` — `feat(writer): entity-md + flow-md writers with atomic write for v2.0.3`
+## 交付物
 
-## Files changed
-- `arch-engine/src/writer/entity-md.ts` (new) — `writeEntityDocs`, renders `entities.md` + writes `entities.json`.
-- `arch-engine/src/writer/flow-md.ts` (new) — `writeFlowDocs`, renders `flow.md` + writes `flow.json`.
-- `arch-engine/src/writer/index.ts` (edit) — re-exports `writeEntityDocs`, `writeFlowDocs`.
+| 文件 | 变更 |
+|------|------|
+| `templates/page-rollout-spec.md` | **新建** — Phase A 完成声明、页面清单、feature 域、跨页约束、logic 引用、B1/B2/B3 说明 |
+| `templates/plan-from-spec.md` | **增补** §0 Phase A 门禁（`check-v0-freeze`）；Part 2 B1/B2/B3 单页 Task 示例 |
+| `templates/feature.md` | **增补** §0 页面工厂与批量门禁、logic SSOT、禁止无 plan 批量 UI |
 
-## Implementation notes
-- Both writers write to `getArchDir(projectRoot)` (`.ai/arch/`).
-- Atomic write helper: mkdir → write `*.tmp` → `fs.rename` to final path. No `.tmp` artifacts left after run.
-- `entities.md`: `# Entities` + per-entity `## {name}` field tables (Field / Type / Column / Nullable), then `## Relations` as `- {from} → {to} ({kind}) [source: {source}]`.
-- `flow.md`: `# Data Flow` + edges grouped by source layer in canonical order (entity → repository → service → controller → api-client → route → store); each edge `- {from} → {to} (confidence: {confidence}) {label?}`. Edges whose `from` node is unknown fall back to the `to` node's layer; fully unresolved edges go under `## Other`.
-- `.json` files use `JSON.stringify(graph, null, 2)`.
+## 验证
 
-## Test summary
-- `tsc --noEmit`: PASS (zero errors), baseline clean before and after.
-- Build (`tsc` to dist): PASS.
-- Runtime smoke test (throwaway script in OS temp, not committed): exercised both writers against sample graphs covering populated fields, an empty-fields entity, relations, multi-layer edges, labeled/unlabeled edges, and an orphan edge. Verified `entities.md`, `flow.md`, `entities.json` content and confirmed no `.tmp` files remain after atomic write. All output matched spec. Temp script removed after run.
-- Scope kept to the 3 whitelisted files; unrelated working-tree changes (`docs/apt/plans/...`, `_write_spec.cjs`) left untouched.
+```text
+node scripts/inject-platform-assets.cjs tmp-inject-test .
+```
+
+- inject OK；`.claude`/`.qoder`/`.zcode` commands 与 `.agents`/`.zcode` skills 均含 `check-v0-freeze`、`B1/B2/B3`、`logic SSOT` 新段落
+- 临时目录已删除
+
+## 与 Spec §5 对照
+
+- [x] rollup spec 骨架（§5.1）→ `page-rollout-spec.md`
+- [x] plan-from-spec Phase A 门禁（§4.5 / §5.2）→ §0
+- [x] 单页 B1/B2/B3 Task 模板（§5.3）→ Part 2 示例
+- [x] feature 与 `/feature` 关系（§5.4）→ §0 批量门禁 + logic SSOT
+
+## 未改动
+
+- MCP 工具、inject `EXTRA_SKILLS`、AGENTS.md（非本 Task 白名单）
