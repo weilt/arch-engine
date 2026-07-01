@@ -50,5 +50,14 @@
 4. 交付前建议 `/verify` 验收
 5. `/verify` 报告落盘 `.apt/verify/latest.md`，`loopDone` 依赖其 PASS。
 
+### Java API 路径前缀纠正（按需）
+
+纠正 Controller URL 前缀时：
+
+1. `query_path_rules` 或 `query_arch` 抽检当前 API path
+2. `update_java_path_rules` 写入规则（默认触发 API reindex）
+3. `query_arch` / `search_arch` 验证 path 已正确
+4. **禁止**对每个 Controller 循环 `refresh_asset`；路径规则变更由 `update_java_path_rules`（或 `start-init --reindex-apis`）统一重算 API 索引
+
 终端：`start-init`（架构）、`design-sync`（设计）、`sync-changes`（批量架构同步）。
 <!-- apt-workflow:end -->

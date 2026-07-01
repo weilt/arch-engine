@@ -112,7 +112,7 @@ function injectAgentsMd(projectRoot, snippetPath) {
   console.log("OK " + agentsPath + " (updated)");
 }
 
-function injectPlatformAssets(projectRoot, aptHome) {
+function injectPlatformAssets(projectRoot, aptHome, options = {}) {
   const root = path.resolve(projectRoot);
   const templatesDir = path.join(path.resolve(aptHome), "templates");
   const snippetPath = path.join(templatesDir, "_agents-md-snippet.md");
@@ -187,6 +187,24 @@ function injectPlatformAssets(projectRoot, aptHome) {
   } else {
     console.warn("WARN: _agents-md-snippet.md not found, skipping AGENTS.md");
   }
+
+  if (!options.noMirror) {
+    mirrorToMcpServerDevCopy(root, aptHome);
+  }
+}
+
+function mirrorToMcpServerDevCopy(projectRoot, aptHome) {
+  const resolvedRoot = path.resolve(projectRoot);
+  const resolvedHome = path.resolve(aptHome);
+  if (resolvedRoot !== resolvedHome) {
+    return;
+  }
+  const mcpDevRoot = path.join(resolvedRoot, "mcp-server");
+  if (!fs.existsSync(path.join(mcpDevRoot, "package.json"))) {
+    return;
+  }
+  console.log("OK mirroring platform assets to " + mcpDevRoot);
+  injectPlatformAssets(mcpDevRoot, aptHome, { noMirror: true });
 }
 
 function main() {
@@ -216,6 +234,7 @@ module.exports = {
   skillNameFromFile,
   injectAgentsMd,
   injectPlatformAssets,
+  mirrorToMcpServerDevCopy,
   extractWorkflowBlock,
   PUBLIC_TEMPLATES,
   EXTRA_SKILLS,

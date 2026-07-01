@@ -10,6 +10,15 @@
 
 可选补救：在项目根执行 `sync-changes` 或 `sync-changes --dry-run` 预览。
 
+### 0.5 Java API 路径前缀（若本次涉及）
+
+若 audit 显示大量 API `modified` 且根因是路径前缀规则而非业务逻辑变更：
+
+1. `query_path_rules` 或 `query_arch` 诊断当前 path
+2. `update_java_path_rules` 一次写入规则并重算 API 索引
+3. `query_arch` / `search_arch` 验证 path 已正确
+4. **禁止**对每个 Controller 循环 `refresh_asset`
+
 ## 1. TS 契约（若有对外 TS 类型）
 
 1. 检查是否新建可供外部调用的接口、类或函数。
