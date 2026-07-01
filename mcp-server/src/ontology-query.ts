@@ -220,6 +220,40 @@ async function deriveTopology(
     } catch {
       // flow.json missing or corrupt: all flow counts stay 0.
     }
+    // v2.0.5: call-graph metrics from call-graph.json; missing/corrupt -> all
+    // stay 0. methodCount counts only real method nodes (id prefix "method:"),
+    // excluding frontend components which share kind "method" at runtime but
+    // use a "component:" id. importEdgeCount covers both "imports" and
+    // "template" edges (both are module/import boundary crossings).
+    let methodCount = 0;
+    let dtoCount = 0;
+    let callEdgeCount = 0;
+    let importEdgeCount = 0;
+    try {
+      const cgRaw = await fs.readFile(
+        path.join(archDir, "call-graph.json"),
+        "utf-8"
+      );
+      const cgParsed = JSON.parse(cgRaw) as {
+        nodes?: { id?: string; kind?: string }[];
+        edges?: { kind?: string }[];
+      };
+      const cgNodes = Array.isArray(cgParsed.nodes) ? cgParsed.nodes : [];
+      const cgEdges = Array.isArray(cgParsed.edges) ? cgParsed.edges : [];
+      methodCount = cgNodes.filter(
+        (n) =>
+          n?.kind === "method" &&
+          typeof n.id === "string" &&
+          n.id.startsWith("method:")
+      ).length;
+      dtoCount = cgNodes.filter((n) => n?.kind === "dto").length;
+      callEdgeCount = cgEdges.filter((e) => e?.kind === "calls").length;
+      importEdgeCount = cgEdges.filter(
+        (e) => e?.kind === "imports" || e?.kind === "template"
+      ).length;
+    } catch {
+      // call-graph.json missing or corrupt: all call-graph counts stay 0.
+    }
 
     return {
       moduleCount,
@@ -227,6 +261,10 @@ async function deriveTopology(
       entityCount,
       flowEdgeCount,
       crossServiceRefs,
+      methodCount,
+      dtoCount,
+      callEdgeCount,
+      importEdgeCount,
     };
   } catch {
     // Overall failure: omit topology entirely.
@@ -357,12 +395,43 @@ async function queryTopic(
   } catch {
     // flow.json missing/corrupt: flowSummary omitted silently.
   }
+  // v2.0.5: call-graph method/DTO drill-down. When the topic matches a module
+  // slug, count that module's methods (id prefix "method:", excluding frontend
+  // components which share kind "method") and DTOs from call-graph.json.
+  // Missing/corrupt call-graph.json omits both fields silently.
+  let methods: number | undefined;
+  let dtos: number | undefined;
+  try {
+    const cgRaw = await fs.readFile(
+      path.join(archDir, "call-graph.json"),
+      "utf-8"
+    );
+    const cgParsed = JSON.parse(cgRaw) as {
+      nodes?: { id?: string; kind?: string; moduleSlug?: string }[];
+    };
+    const cgNodes = Array.isArray(cgParsed.nodes) ? cgParsed.nodes : [];
+    const moduleMethods = cgNodes.filter(
+      (n) =>
+        n?.kind === "method" &&
+        typeof n.id === "string" &&
+        n.id.startsWith("method:") &&
+        n?.moduleSlug?.toLowerCase() === topicLower
+    ).length;
+    const moduleDtos = cgNodes.filter(
+      (n) => n?.kind === "dto" && n?.moduleSlug?.toLowerCase() === topicLower
+    ).length;
+    if (moduleMethods > 0) methods = moduleMethods;
+    if (moduleDtos > 0) dtos = moduleDtos;
+  } catch {
+    // call-graph.json missing/corrupt: methods/dtos omitted silently.
+  }
 
   const matchedIn: string[] = [];
   if (assets.length > 0) matchedIn.push("architecture");
   if (contracts.length > 0) matchedIn.push("contracts");
   if (designPages && designPages.length > 0) matchedIn.push("design");
-  if (entities || flowSummary) matchedIn.push("ontology");
+  if (entities || flowSummary || methods !== undefined || dtos !== undefined)
+    matchedIn.push("ontology");
 
   const result: OntologyTopicResult = {
     topic,
@@ -373,6 +442,8 @@ async function queryTopic(
   if (designPages) result.designPages = designPages;
   if (entities) result.entities = entities;
   if (flowSummary) result.flowSummary = flowSummary;
+  if (methods !== undefined) result.methods = methods;
+  if (dtos !== undefined) result.dtos = dtos;
   return result;
 }
 

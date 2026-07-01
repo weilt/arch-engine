@@ -1,21 +1,33 @@
-import type { DocumentModel, EntityGraph, FlowGraph, JavaModule } from "../types.js";
+import type {
+  CallGraph,
+  DocumentModel,
+  EntityGraph,
+  FlowGraph,
+  FrontendPackage,
+  JavaModule,
+} from "../types.js";
 import { scanJpaEntities } from "./entity-jpa.js";
 import { scanMybatisEntities } from "./entity-mybatis.js";
 import { scanSqlEntities } from "./entity-sql.js";
 import { deriveFlowGraph } from "./flow-scanner.js";
+import { scanCallGraphJava } from "./call-graph-java.js";
+import { scanCallGraphFrontend } from "./call-graph-frontend.js";
 
-export type ScannerPhase = "entity" | "flow" | "asset";
+export type ScannerPhase = "entity" | "flow" | "asset" | "call-graph";
 
 export interface ScannerContext {
   projectRoot: string;
   modules: JavaModule[];
   model: DocumentModel;
   entityNames?: string[];
+  packageDirs?: Map<string, string>;
+  packages?: FrontendPackage[];
 }
 
 export interface ScannerResult {
   entities?: Partial<EntityGraph>;
   flows?: Partial<FlowGraph>;
+  callGraph?: CallGraph;
 }
 
 export interface ScannerPlugin {
@@ -63,6 +75,33 @@ export function createScannerRegistry(): ScannerPlugin[] {
         }
         const flows = await deriveFlowGraph(ctx.projectRoot, ctx.entityNames, ctx.model);
         return { flows };
+      },
+    },
+    // Call-graph phase: Java method/DTO graph (depends on modules).
+    {
+      name: "call-graph-java",
+      phase: "call-graph",
+      async scan(ctx) {
+        const result = await scanCallGraphJava(
+          ctx.projectRoot,
+          ctx.modules,
+          ctx.model,
+        );
+        return { callGraph: result };
+      },
+    },
+    // Call-graph phase: frontend component graph (depends on packageDirs).
+    {
+      name: "call-graph-frontend",
+      phase: "call-graph",
+      async scan(ctx) {
+        if (!ctx.packageDirs) return {};
+        const result = await scanCallGraphFrontend(
+          ctx.projectRoot,
+          ctx.packageDirs,
+          ctx.packages ?? ctx.model.packages,
+        );
+        return { callGraph: result };
       },
     },
   ];

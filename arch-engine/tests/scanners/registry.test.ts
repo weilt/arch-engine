@@ -41,18 +41,27 @@ function emptyModel(): DocumentModel {
 }
 
 describe("createScannerRegistry", () => {
-  it("returns 4 plugins: 3 entity-phase + 1 flow-phase", () => {
+  it("returns 6 plugins: 3 entity-phase + 1 flow-phase + 2 call-graph-phase", () => {
     const registry = createScannerRegistry();
 
-    expect(registry).toHaveLength(4);
+    expect(registry).toHaveLength(6);
 
     const entityPlugins = registry.filter((p) => p.phase === "entity");
     const flowPlugins = registry.filter((p) => p.phase === "flow");
+    const callGraphPlugins = registry.filter((p) => p.phase === "call-graph");
     expect(entityPlugins).toHaveLength(3);
     expect(flowPlugins).toHaveLength(1);
+    expect(callGraphPlugins).toHaveLength(2);
 
     const names = registry.map((p) => p.name).sort();
-    expect(names).toEqual(["entity-jpa", "entity-mybatis", "entity-sql", "flow-derive"]);
+    expect(names).toEqual([
+      "call-graph-frontend",
+      "call-graph-java",
+      "entity-jpa",
+      "entity-mybatis",
+      "entity-sql",
+      "flow-derive",
+    ]);
   });
 
   it("entity-phase plugins produce entity results from a JPA @Entity fixture", async () => {

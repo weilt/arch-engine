@@ -113,6 +113,18 @@
       "description": "Factory for the scanner plugin registry (v2.0.4). Returns ScannerPlugin[] with 4 plugins across 2 phases: entity phase (entity-jpa via AST dispatcher, entity-mybatis, entity-sql) and flow phase (flow-derive via deriveFlowGraph with RPC Step 4). Entity merge (mergeEntityGraphs) happens in pipeline after entity phase, not as a plugin. Registry traversal replaces hardcoded scanner calls in pipeline.ts runStartInit.",
       "tsFilePath": "arch-engine/src/scanners/registry.ts",
       "registeredAt": "2026-06-30T10:25:58.260Z"
+    },
+    {
+      "name": "CallGraph",
+      "description": "v2.0.5 Call graph data model: method/dto nodes + calls/imports/uses/template edges. DocumentModel.callGraph?: CallGraph.",
+      "tsFilePath": "arch-engine/src/types.ts",
+      "registeredAt": "2026-06-30T14:38:45.357Z"
+    },
+    {
+      "name": "OntologyTopology",
+      "description": "v2.0.5 Ontology topology metrics: moduleCount, rpcEndpoints, entityCount, flowEdgeCount, crossServiceRefs, methodCount, dtoCount, callEdgeCount, importEdgeCount.",
+      "tsFilePath": "mcp-server/src/ontology/types.ts",
+      "registeredAt": "2026-06-30T14:38:45.359Z"
     }
   ],
   "missingRequests": []

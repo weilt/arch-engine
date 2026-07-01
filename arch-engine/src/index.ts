@@ -20,6 +20,13 @@ export type {
   FlowEdge,
   FlowLayer,
 } from "./types.js";
+export type {
+  CallGraph,
+  CallGraphNode,
+  CallGraphNodeKind,
+  CallGraphEdge,
+  CallGraphEdgeKind,
+} from "./types.js";
 
 export {
   getArchDir,
@@ -48,6 +55,8 @@ export { scanMybatisEntities } from "./scanners/entity-mybatis.js";
 export { scanSqlEntities } from "./scanners/entity-sql.js";
 export { mergeEntityGraphs } from "./scanners/entity-merge.js";
 export { deriveFlowGraph } from "./scanners/flow-scanner.js";
+export { scanCallGraphJava } from "./scanners/call-graph-java.js";
+export { scanCallGraphFrontend } from "./scanners/call-graph-frontend.js";
 
 export {
   writeMarkdownTree,
@@ -62,6 +71,7 @@ export {
 
 export { writeEntityDocs } from "./writer/entity-md.js";
 export { writeFlowDocs } from "./writer/flow-md.js";
+export { writeCallGraph } from "./writer/call-graph.js";
 
 export { VectorStore, type SearchHit } from "./vector/sqlite-store.js";
 

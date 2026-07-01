@@ -89,6 +89,11 @@ export interface OntologyTopology {
   entityCount: number;
   flowEdgeCount: number;
   crossServiceRefs: number;
+  // v2.0.5: call-graph metrics (omitted when not computed).
+  methodCount?: number;
+  dtoCount?: number;
+  callEdgeCount?: number;
+  importEdgeCount?: number;
 }
 
 // Full project ontology snapshot (spec section 3.2).
@@ -116,4 +121,7 @@ export interface OntologyTopicResult {
   designPages?: string[];
   entities?: string[];
   flowSummary?: { nodes: number; edges: number };
+  // v2.0.5: call-graph method/DTO drill-down (omitted when not computed).
+  methods?: number;
+  dtos?: number;
 }

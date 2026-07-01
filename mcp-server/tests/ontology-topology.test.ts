@@ -95,6 +95,23 @@ describe("querySnapshot topology", () => {
           { from: "entity:User", to: "service:UserService", confidence: "high" },
         ],
       }),
+      ".ai/arch/call-graph.json": JSON.stringify({
+        nodes: [
+          { id: "method:UserService#findById", kind: "method", name: "findById", moduleSlug: "foo" },
+          { id: "method:UserService#save", kind: "method", name: "save", moduleSlug: "foo" },
+          // Frontend component shares kind "method" but a "component:" id -> excluded.
+          { id: "component:UserCard", kind: "method", name: "UserCard", moduleSlug: "foo" },
+          { id: "dto:UserDTO", kind: "dto", name: "UserDTO", moduleSlug: "foo" },
+          { id: "dto:OrderDTO", kind: "dto", name: "OrderDTO", moduleSlug: "foo" },
+        ],
+        edges: [
+          { from: "method:UserService#findById", to: "method:UserService#save", kind: "calls", confidence: "high" },
+          { from: "component:UserCard", to: "method:UserService#findById", kind: "calls", confidence: "high" },
+          { from: "component:UserCard", to: "dto:UserDTO", kind: "imports", confidence: "high" },
+          { from: "method:UserService#save", to: "dto:UserDTO", kind: "template", confidence: "high" },
+          { from: "method:UserService#findById", to: "dto:UserDTO", kind: "uses", confidence: "high" },
+        ],
+      }),
     });
     expect(await topology(root)).toEqual({
       moduleCount: 1,
@@ -102,6 +119,10 @@ describe("querySnapshot topology", () => {
       entityCount: 3,
       flowEdgeCount: 3,
       crossServiceRefs: 2,
+      methodCount: 2,
+      dtoCount: 2,
+      callEdgeCount: 2,
+      importEdgeCount: 2,
     });
   });
 
@@ -115,6 +136,10 @@ describe("querySnapshot topology", () => {
       entityCount: 0,
       flowEdgeCount: 0,
       crossServiceRefs: 0,
+      methodCount: 0,
+      dtoCount: 0,
+      callEdgeCount: 0,
+      importEdgeCount: 0,
     });
   });
 
@@ -133,6 +158,10 @@ describe("querySnapshot topology", () => {
       entityCount: 0,
       flowEdgeCount: 1,
       crossServiceRefs: 1,
+      methodCount: 0,
+      dtoCount: 0,
+      callEdgeCount: 0,
+      importEdgeCount: 0,
     });
   });
 
@@ -160,6 +189,10 @@ describe("querySnapshot topology", () => {
       entityCount: 0,
       flowEdgeCount: 4,
       crossServiceRefs: 3,
+      methodCount: 0,
+      dtoCount: 0,
+      callEdgeCount: 0,
+      importEdgeCount: 0,
     });
   });
 
@@ -176,6 +209,35 @@ describe("querySnapshot topology", () => {
       entityCount: 0,
       flowEdgeCount: 0,
       crossServiceRefs: 0,
+      methodCount: 0,
+      dtoCount: 0,
+      callEdgeCount: 0,
+      importEdgeCount: 0,
+    });
+  });
+  it("treats a corrupt call-graph.json as zero call-graph counts (not omitted)", async () => {
+    await writeBaseFixture(root);
+    await writeFiles(root, {
+      ".ai/arch/entities.json": JSON.stringify({
+        entities: [{ name: "User", moduleSlug: "foo" }],
+        relations: [],
+      }),
+      ".ai/arch/flow.json": JSON.stringify({
+        nodes: [{ id: "entity:User", layer: "entity", name: "User", moduleSlug: "foo" }],
+        edges: [{ from: "entity:User", to: "service:UserService", confidence: "high" }],
+      }),
+      ".ai/arch/call-graph.json": "{ this is not valid json",
+    });
+    expect(await topology(root)).toEqual({
+      moduleCount: 1,
+      rpcEndpoints: 0,
+      entityCount: 1,
+      flowEdgeCount: 1,
+      crossServiceRefs: 0,
+      methodCount: 0,
+      dtoCount: 0,
+      callEdgeCount: 0,
+      importEdgeCount: 0,
     });
   });
 });

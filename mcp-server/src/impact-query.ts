@@ -9,7 +9,13 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { getArchDir } from "@apt/arch-engine";
-import type { FlowNode, FlowEdge, EntityRelation } from "@apt/arch-engine";
+import type {
+  FlowNode,
+  FlowEdge,
+  EntityRelation,
+  CallGraphNode,
+  CallGraphEdge,
+} from "@apt/arch-engine";
 
 export interface ImpactLayer {
   layer: string;
@@ -21,6 +27,12 @@ export interface ImpactResult {
   layers: ImpactLayer[];
   relations: EntityRelation[];
   note?: string;
+  // v2.0.5 call-graph layer (all optional; omitted when call-graph.json is
+  // missing/corrupt or when nothing matches).
+  dto?: { fields: { name: string; type: string }[]; usedBy: string[] };
+  method?: { callers: string[]; callees: string[]; annotations: string[] };
+  component?: { importers: string[]; imports: string[]; templateUsers: string[] };
+  graphReferences?: string[];
 }
 
 // Canonical layer ordering, deepest-first so impact reads bottom-up:
@@ -55,6 +67,108 @@ const EMPTY = (entity: string, note: string): ImpactResult => ({
   note,
 });
 
+// ---------------------------------------------------------------------------
+// v2.0.5 call-graph matching helpers.
+//
+// Each helper returns undefined when nothing matches, so the caller can omit
+// the field entirely. Component nodes carry a `component:` id prefix at
+// runtime even though the typed node-kind union is method|dto, so components
+// are matched by id rather than kind.
+// ---------------------------------------------------------------------------
+
+// DTO: its field list plus every method that "uses" it.
+function matchDto(
+  entity: string,
+  nodes: CallGraphNode[],
+  edges: CallGraphEdge[]
+): { fields: { name: string; type: string }[]; usedBy: string[] } | undefined {
+  const node = nodes.find(
+    (n) =>
+      !!n &&
+      n.kind === "dto" &&
+      (n.id === `dto:${entity}` || n.name === entity)
+  );
+  if (!node) return undefined;
+  const fields = Array.isArray(node.fields) ? node.fields : [];
+  const usedBy = edges
+    .filter((e) => !!e && e.kind === "uses" && e.to === node.id)
+    .map((e) => e.from);
+  return { fields, usedBy };
+}
+
+// Method (dotted "Class.method" or a bare name): reverse callers, forward
+// callees, and the method's own annotations.
+function matchMethod(
+  entity: string,
+  nodes: CallGraphNode[],
+  edges: CallGraphEdge[]
+): { callers: string[]; callees: string[]; annotations: string[] } | undefined {
+  let methodId: string | undefined;
+  const dot = entity.indexOf(".");
+  if (dot !== -1) {
+    methodId = `method:${entity.slice(0, dot)}#${entity.slice(dot + 1)}`;
+  }
+  const node = nodes.find((n) => {
+    if (!n || n.kind !== "method") return false;
+    return (methodId !== undefined && n.id === methodId) || n.name === entity;
+  });
+  if (!node) return undefined;
+  const callers = edges
+    .filter((e) => !!e && e.kind === "calls" && e.to === node.id)
+    .map((e) => e.from);
+  const callees = edges
+    .filter((e) => !!e && e.kind === "calls" && e.from === node.id)
+    .map((e) => e.to);
+  const annotations = Array.isArray(node.annotations) ? node.annotations : [];
+  return { callers, callees, annotations };
+}
+
+// Frontend component: reverse importers, forward imports, and reverse
+// template users.
+function matchComponent(
+  entity: string,
+  nodes: CallGraphNode[],
+  edges: CallGraphEdge[]
+):
+  | { importers: string[]; imports: string[]; templateUsers: string[] }
+  | undefined {
+  const id = `component:${entity}`;
+  const node = nodes.find((n) => {
+    if (!n || typeof n.id !== "string") return false;
+    return (
+      n.id === id || (n.id.startsWith("component:") && n.name === entity)
+    );
+  });
+  if (!node) return undefined;
+  const importers = edges
+    .filter((e) => !!e && e.kind === "imports" && e.to === node.id)
+    .map((e) => e.from);
+  const imports = edges
+    .filter((e) => !!e && e.kind === "imports" && e.from === node.id)
+    .map((e) => e.to);
+  const templateUsers = edges
+    .filter((e) => !!e && e.kind === "template" && e.to === node.id)
+    .map((e) => e.from);
+  return { importers, imports, templateUsers };
+}
+
+// Loose cross-graph reference: DTOs/methods whose name mentions the queried
+// entity, surfaced alongside flow layers for fuller impact scoping. Omitted
+// when empty.
+function collectGraphReferences(
+  entity: string,
+  nodes: CallGraphNode[]
+): string[] {
+  const refs: string[] = [];
+  for (const n of nodes) {
+    if (!n || (n.kind !== "method" && n.kind !== "dto")) continue;
+    if (typeof n.name === "string" && n.name.includes(entity)) {
+      refs.push(n.id);
+    }
+  }
+  return refs;
+}
+
 export async function handleQueryImpact(
   projectRoot: string,
   entity: string
@@ -62,6 +176,7 @@ export async function handleQueryImpact(
   const archDir = getArchDir(projectRoot);
   const flowPath = path.join(archDir, "flow.json");
   const entitiesPath = path.join(archDir, "entities.json");
+  const callGraphPath = path.join(archDir, "call-graph.json");
 
   // Degradation level 1: flow.json missing -> the entity/flow index has not
   // been built (start-init not run). Report empty, not an error.
@@ -97,11 +212,10 @@ export async function handleQueryImpact(
     (e) => e && (e.from === entityId || e.to === entityId)
   );
 
-  // Degradation level 3: entity not found. "Found" means the entity node
-  // exists OR some edge references it (robust to nodes being pruned).
-  if (!nodeById.has(entityId) && touching.length === 0) {
-    return EMPTY(entity, "entity not found");
-  }
+  // "Found" means the entity node exists OR some edge references it (robust
+  // to nodes being pruned). The not-found decision is deferred until after
+  // call-graph matching so method/dto/component-only targets still resolve.
+  const entityFound = nodeById.has(entityId) || touching.length > 0;
 
   // For each touching edge, the "reference" is the non-entity endpoint.
   // Track the highest confidence across all edges linking a given node so a
@@ -156,5 +270,47 @@ export async function handleQueryImpact(
     relations = [];
   }
 
-  return { entity, layers, relations };
+  // --- v2.0.5 call-graph layer ------------------------------------------------
+  // Fault-tolerant read mirroring flow.json: a missing/corrupt call-graph.json
+  // is silent -- all new fields stay omitted while entity/flow results are
+  // returned intact.
+  let cgNodes: CallGraphNode[] = [];
+  let cgEdges: CallGraphEdge[] = [];
+  try {
+    const cgRaw = await fs.readFile(callGraphPath, "utf-8");
+    const parsed = JSON.parse(cgRaw) as {
+      nodes?: CallGraphNode[];
+      edges?: CallGraphEdge[];
+    };
+    cgNodes = Array.isArray(parsed.nodes) ? parsed.nodes : [];
+    cgEdges = Array.isArray(parsed.edges) ? parsed.edges : [];
+  } catch {
+    // missing/corrupt -> omit new fields, keep existing results
+  }
+
+  const dtoMatch = matchDto(entity, cgNodes, cgEdges);
+  const methodMatch = matchMethod(entity, cgNodes, cgEdges);
+  const componentMatch = matchComponent(entity, cgNodes, cgEdges);
+  const hasCallGraphMatch =
+    dtoMatch !== undefined ||
+    methodMatch !== undefined ||
+    componentMatch !== undefined;
+
+  // Degradation level 3: neither the flow graph nor the call graph know this
+  // target.
+  if (!entityFound && !hasCallGraphMatch) {
+    return EMPTY(entity, "entity not found");
+  }
+
+  const result: ImpactResult = { entity, layers, relations };
+  if (dtoMatch) result.dto = dtoMatch;
+  if (methodMatch) result.method = methodMatch;
+  if (componentMatch) result.component = componentMatch;
+  // graphReferences belongs to the entity path: only when the target is also
+  // a real flow-graph entity do we surface call-graph symbols mentioning it.
+  if (entityFound) {
+    const graphReferences = collectGraphReferences(entity, cgNodes);
+    if (graphReferences.length > 0) result.graphReferences = graphReferences;
+  }
+  return result;
 }
