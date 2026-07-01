@@ -9,7 +9,17 @@ model: sonnet
 
 用户只需描述功能；**不要**让用户选择「走契约还是 arch」——由你自动寻址。
 
-## 0. 任务与依赖
+## 0. 页面工厂与批量门禁
+
+| 场景 | 路径 |
+|------|------|
+| 单页、口头需求 | 本命令 `/feature` |
+| **全页批量**（多 `page-id` / 引用 `_pages.md`） | **必须** rollup spec + **`/plan-from-spec`** → `/implement-plan`；**禁止**无 plan 批量 UI |
+| Phase A 未完成 | `node scripts/check-v0-freeze.mjs` **FAIL** 或 `_pages.md` 存在 `approved ≠ yes` → **禁止批量 UI 实现**（可先单页 handoff 或非 UI 逻辑） |
+
+**logic SSOT：** `designs/v0/<page-id>/page.logic.md`（经 `query_design(page:)` 读）为冻结业务真相。实现偏离时 **先改 logic** → 单页 `design-sync` → 再改代码；**禁止**静默漂移。
+
+## 0.1 任务与依赖
 
 分析任务，列出开发所需的每一个依赖（接口、组件、类、工具、枚举、API 等），写出名称即可。
 
@@ -20,8 +30,9 @@ model: sonnet
 1. **`query_design`**（`scope: "global"`）— 记录 tokens 与 `style.md` 约束。
 2. **`query_design`**（`page: <本页 slug>`）— 读页面配方；若无，**`search_ui`** 找最接近的页面/组件模板。
 3. 列出本页需要的**语义组件**，逐个 **`query_design`**（`component: <id>`）。
-4. 若缺组件/页面定义 → **`report_design_gap`**，**停止 UI 实现**（可先写接口与纯逻辑）。
-5. `query_design(scope: global)` 返回的 `bindings`：有则按 `_meta.framework` 优先用组件库映射；无则 tokens + 语义结构实现。
+4. 若缺组件/页面定义，或 `gaps` 含 **`manifest-not-approved`** / **`no-implementation-ref`** / **`missing-logic`** → **`report_design_gap`**，**停止 UI 实现**（可先写接口与纯逻辑）。
+5. **以冻结 logic 为 SSOT**（`page.logic.md` / `query_design` 返回的 logic 摘要）：与 PM 设计或实现不一致时，**先更新 logic 并 re-sync**，不得直接在 `src/` 偏离。
+6. `query_design(scope: global)` 返回的 `bindings`：有则按 `_meta.framework` 优先用组件库映射；无则 tokens + 语义结构实现。
 
 无 `.ai/design/profile.json` 时：报告需先执行 `design-sync` 或 `/design-system`。
 

@@ -7,7 +7,17 @@ model: sonnet
 
 用户应提供 spec 路径（如 `docs/superpowers/specs/2026-06-17-foo-design.md`）。若未提供，先询问。
 
-## 0. 读取 spec（允许）
+## 0. Phase A 门禁（rollup / 页面工厂 spec 时必须）
+
+当 spec 为 **rollup spec**（路径含 `pages-rollout-spec`，或引用 `designs/v0/_pages.md` 多页批量实现）时，**在 §0.5 与 §1 之前**执行：
+
+1. 确认 spec §1 已声明 Phase A 完成（`_pages.md` 全 `approved = yes`）。
+2. 在项目根执行：**`node scripts/check-v0-freeze.mjs`**
+3. **exit 0（PASS）** → 继续规划；**exit 1（FAIL）** → **停止**，报告未 approved 页面或缺失双文件，提示先完成 **`apt-v0-handoff`** 与批量 `design-sync`，**禁止**产出全页 UI 实现 Task。
+
+> 非 rollup 的单功能 spec 可跳过本门禁。
+
+## 0.1 读取 spec（允许）
 
 1. 读取用户给出的 **spec 文件**（仅此文件与后续要写入的 plan 文件可直接读；**禁止**未经 MCP 打开 `.ai/` 下其它文件）。
 2. 提取：**Goal**、范围、非目标、依赖清单、是否含前端 UI、验收标准。
@@ -89,12 +99,44 @@ model: sonnet
 ### Task 2: …
 ```
 
+**rollup / 页面工厂 spec — 单页 B1/B2/B3 示例（每个 `page-id` 至少覆盖下列能力；小页可合并 Task）：**
+
+```markdown
+### Task N: <page-id> — B1 依赖与接口
+- [ ] `query_design` page=`<page-id>` 读 logic 与 gaps
+  - **MCP:** `query_design` page=`<page-id>`
+  - **Files:** （本 Task 仅后端/契约时填写）
+- [ ] 对 logic §依赖 中每个 API 意向名寻址
+  - **MCP:** `query_contract` name=`…`；未命中 → `search_arch` → `query_arch`
+  - **Files:** `src/…`
+- [ ] 无命中：定落点并新建 API/client
+  - **MCP:** `query_impact` / `query_ontology`；新建后 `register_contract` / `refresh_asset`
+  - **Files:** `src/contracts/…`, `src/…`
+  - **Verify:** `npm test -- …` 或模块单测
+
+### Task N+1: <page-id> — B2 前端页面
+- [ ] 读 global tokens 与本页配方
+  - **MCP:** `query_design` scope=`global`；`query_design` page=`<page-id>`；各语义组件 `component=…`
+  - **Files:** `src/…`
+- [ ] 按 `refs/<id>.tsx` + bindings 实现页面；**以 `designs/v0/<page-id>/page.logic.md` 为 SSOT**
+  - **MCP:** 同上；`gaps` 含 blocking → `report_design_gap`，停 UI
+  - **Files:** `src/…`
+  - **Verify:** 页面可渲染 / 组件测试
+
+### Task N+2: <page-id> — B3 页级闭环
+- [ ] 注册 UI pattern；刷新本 Task 触及的 arch
+  - **MCP:** `register_ui_pattern`；`refresh_asset` sourcePath=`…`
+  - **Files:** （如有）
+  - **Verify:** `audit_arch_changes` 抽检或相关测试
+```
+
 **Part 2 要求：**
 
 - 每个 Task 至少一个 checkbox 步骤；粒度 **2–5 分钟**，过大 Task 编排失效
 - 每个 Task **必须**含 **Files**（白名单）、**Verify**（验收命令）；涉及已有契约/架构/设计的步骤必须带 **MCP**（不得空写类名）
 - 含测试与验证步骤；是否需要 TDD 按 spec 约定，默认关键逻辑有测试步骤
 - **不要**写「提交 git」步骤（子 Agent 每 Task 自动 commit）
+- **rollup spec：** 每个 `page-id` 须含 B1/B2/B3 能力（可合并为 fewer Task，但不得省略）；多页按依赖顺序串列 Task
 
 ## 3. 交付与门禁
 

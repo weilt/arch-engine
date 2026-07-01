@@ -80,6 +80,85 @@ design-bindings --check --strict
 
 告知用户：后续用 **`/feature`** 实现该页，子 agent 先 `query_design(page: …)` 再查 arch。
 
+---
+
+## 附录 A：v0 页面 Handoff（两阶段工厂 Phase A）
+
+适用：PM 在 v0 完成视觉稿后，由**开发**逐页沉淀「页面是什么功能」+ 操作逻辑，供 Phase B 批量实现时 `query_design(page: …)` 寻址。
+
+**主路径：** Codex **`apt-v0-handoff`**；Cursor 等通过 `.agents/skills/apt-v0-handoff/`。PM **仅交** v0 成品与设计文档，**不写** `page.manifest.json` / `page.logic.md`。
+
+### A.1 PM 交付（仅素材）
+
+| 交付物 | 说明 |
+|--------|------|
+| v0 成品 | 链接、导出 `page.tsx`、截图；可平铺于 `designs/v0-inbox/` |
+| 设计文档 | PRD、流程、权限、业务规则（仓库内 `docs/` 等） |
+
+### A.2 开发逐页 handoff（`apt-v0-handoff`）
+
+进度 SSOT：`designs/v0/_pages.md`（开发维护）。
+
+每页一轮（**禁止**批量糊 logic）：
+
+1. 确认 `page-id`（kebab-case，与用户确认）
+2. `query_design(scope: global)` — 记录语义组件 id
+3. 对照 v0 控件 + PM 文档，创建 `designs/v0/<page-id>/`
+4. 开发写入 **`page.manifest.json`** + **`page.logic.md`**（`draft` → 核对后 `approved`，`reviewedBy` / `reviewedAt` 由开发/TL 认定）
+5. 推荐拷入 v0 导出的 **`page.tsx`**（及可选 `preview.html`）
+6. 单页 `design-sync --adapter v0 --source designs/v0/<page-id>`；`query_design(page:)` 自检；更新 `_pages.md`
+
+内联字段规则见 **`templates/v0-visual-handoff-prompt.md`**（Agent 写字段参考，非 PM 必跑流程）。
+
+目录结构：
+
+```
+designs/v0/_pages.md     # 进度表（开发维护）
+designs/v0/<page-id>/
+  page.manifest.json   # 必填：id、pageType、feature、route、status 等
+  page.logic.md        # 必填：操作明细、主流程、状态、依赖
+  page.tsx             # 推荐：v0 导出 React 源码
+  preview.html         # 可选
+```
+
+### A.3 Phase A 结束门禁
+
+全部页面 `approved = yes` 且双文件齐全后，在项目根执行：
+
+```bash
+node scripts/check-v0-freeze.mjs
+```
+
+**exit 0（PASS）** 才允许 Phase B（rollup spec → `/plan-from-spec` → `/implement-plan`）。
+
+### A.4 定稿同步
+
+单页：
+
+```bash
+design-sync --adapter v0 --source designs/v0/<page-id>
+```
+
+批量（扫描 `designs/v0/*` 下含 manifest 的子目录）：
+
+```bash
+design-sync --adapter v0 --source designs/v0
+```
+
+预览：
+
+```bash
+design-sync --adapter v0 --source designs/v0/<page-id> --dry-run
+```
+
+同步后：`.ai/design/pages/<id>.json`、`.ai/design/logic/<id>.md`、`.ai/design/refs/<id>.tsx`（若有）。
+
+### A.5 验收
+
+1. `query_design`（`page: <page-id>`）— 应含 `pageType`、`feature`、`logicMarkdown`
+2. `status !== approved` 时 `gaps` 含 **`manifest-not-approved`** — 开发须 `report_design_gap`，不得写 UI
+3. 无 `page.tsx` 时 `gaps` 含 **`no-implementation-ref`**
+
 ## 7. 输出
 
 简短摘要：页面 slug、来源路径、引用语义组件数量、是否更新了已有配方、bindings check 结果（若执行）、下一步（`/feature` 或继续补其它页面）。

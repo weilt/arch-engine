@@ -18,6 +18,7 @@
 | 闭环补救 | `/finish-feature` | `apt-finish-feature` |
 | 设计系统同步 | `/design-system` | `apt-design-system` |
 | 单页设计定稿 | `/design-page` | `apt-design-page` |
+| v0 逐页 handoff（Phase A） | Skill `apt-v0-handoff` | `apt-v0-handoff` |
 
 ### 推荐流程
 
@@ -43,9 +44,13 @@
 2. `modified` → `refresh_asset`；`new`/`unregistered` → `refresh_asset`；`deleted` → `remove_asset`
 3. 新对外 TS 类型 → `register_contract`
 4. 交付前建议 `/verify` 验收
+5. `/verify` 报告落盘 `.apt/verify/latest.md`，`loopDone` 依赖其 PASS。
 
 终端：`start-init`（架构）、`design-sync`（设计）、`sync-changes`（批量架构同步）。
 <!-- apt-workflow:end -->
+
+
+
 
 
 
