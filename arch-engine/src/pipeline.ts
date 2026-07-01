@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 import fg from "fast-glob";
@@ -29,7 +30,10 @@ import {
   isStarterModule,
   scanJavaSources,
 } from "./scanners/java.js";
-import { resolveJavaPathRules } from "./scanners/java-path-rules.js";
+import {
+  resolveJavaPathRules,
+  type ResolvedJavaPathRules,
+} from "./scanners/java-path-rules.js";
 import { mergeDocumentModel } from "./scanners/merge.js";
 import { scanOpenApiGlobs } from "./scanners/openapi.js";
 import { mergeEntityGraphs } from "./scanners/entity-merge.js";
@@ -61,6 +65,7 @@ import {
   writeArchIndex,
   writeIndexMd,
   writeMarkdownTree,
+  writePathRulesSnapshot,
   type ArchIndex,
 } from "./writer/index.js";
 import { writeModuleAssetDocs } from "./writer/asset-md.js";
@@ -99,6 +104,20 @@ export function detectNewUnits(
     if (!previous.has(slug)) added.add(slug);
   }
   return added;
+}
+
+/** Stable SHA-256 of resolved path rules (contextPath + prefixes sorted by pattern). */
+export function computePathRulesHash(resolved: ResolvedJavaPathRules): string {
+  const payload = {
+    contextPath: resolved.contextPath,
+    controllerPrefixes: [...resolved.controllerPrefixes]
+      .sort((a, b) => a.controllerPattern.localeCompare(b.controllerPattern))
+      .map((r) => ({
+        prefix: r.prefix,
+        controllerPattern: r.controllerPattern,
+      })),
+  };
+  return crypto.createHash("sha256").update(JSON.stringify(payload)).digest("hex");
 }
 
 export interface PipelineDeps {
@@ -262,7 +281,8 @@ function buildLastScanState(
   packageAssetCounts: Map<string, number>,
   fileHashMap: Record<string, Record<string, string>>,
   commit: string,
-  branch: string
+  branch: string,
+  pathRulesHash?: string
 ): LastScanState {
   const modulesState: LastScanState["modules"] = { ...(previous?.modules ?? {}) };
   for (const mod of modules) {
@@ -292,6 +312,7 @@ function buildLastScanState(
     scannedAt: new Date().toISOString(),
     modules: modulesState,
     packages: packagesState,
+    ...(pathRulesHash !== undefined ? { pathRulesHash } : {}),
   };
 }
 
@@ -408,8 +429,11 @@ export async function runStartInit(
   archLog.info("start-init: scanning project");
   const modules = config.scanners.java ? await findMavenModules(projectRoot) : [];
   let javaPathRules: Awaited<ReturnType<typeof resolveJavaPathRules>> | undefined;
+  let pathRulesHash: string | undefined;
   if (config.scanners.java) {
-    javaPathRules = await resolveJavaPathRules(projectRoot);
+    javaPathRules = await resolveJavaPathRules(projectRoot, config);
+    pathRulesHash = computePathRulesHash(javaPathRules);
+    await writePathRulesSnapshot(projectRoot, javaPathRules);
     archLog.info("start-init: java path rules", {
       confidence: javaPathRules.confidence,
       contextPath: javaPathRules.contextPath || "(none)",
@@ -418,10 +442,24 @@ export async function runStartInit(
         prefix: r.prefix,
         pattern: r.controllerPattern,
       })),
+      pathRulesHash,
     });
+    if (
+      incremental &&
+      previousScan?.pathRulesHash &&
+      previousScan.pathRulesHash !== pathRulesHash
+    ) {
+      archLog.warn(
+        "start-init: path rules changed since last scan; run start-init --reindex-apis to refresh API paths",
+        {
+          previousHash: previousScan.pathRulesHash,
+          currentHash: pathRulesHash,
+        }
+      );
+    }
   }
   const { apis: javaApis, rpcs } = config.scanners.java
-    ? await scanJavaSources(projectRoot, modules, javaPathRules)
+    ? await scanJavaSources(projectRoot, modules, javaPathRules, config)
     : { apis: [], rpcs: [] };
   const openApis = await scanOpenApiGlobs(projectRoot, config.apiSpecGlobs);
   const packages = config.scanners.frontend ? await scanFrontend(projectRoot) : [];
@@ -767,7 +805,8 @@ export async function runStartInit(
       packageAssetCounts,
       fileHashMap,
       commit,
-      branch
+      branch,
+      pathRulesHash
     )
   );
 

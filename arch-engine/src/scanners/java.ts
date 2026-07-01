@@ -1,7 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import fg from "fast-glob";
-import type { ApiEndpoint, JavaModule, RpcEndpoint } from "../types.js";
+import type { ApiEndpoint, ArchConfig, JavaModule, RpcEndpoint } from "../types.js";
 import { parseFeignInterface } from "./java-feign.js";
 import {
   applyPathRulesToEndpointPath,
@@ -58,9 +58,10 @@ function buildRpcSummary(feign: ReturnType<typeof parseFeignInterface>): string 
 export async function scanJavaSources(
   projectRoot: string,
   modules: JavaModule[],
-  pathRules?: ResolvedJavaPathRules
+  pathRules?: ResolvedJavaPathRules,
+  config?: ArchConfig
 ): Promise<{ apis: ApiEndpoint[]; rpcs: RpcEndpoint[] }> {
-  const rules = pathRules ?? (await resolveJavaPathRules(projectRoot));
+  const rules = pathRules ?? (await resolveJavaPathRules(projectRoot, config));
   const apis: ApiEndpoint[] = [];
   const rpcs: RpcEndpoint[] = [];
   const seenRpc = new Set<string>();
