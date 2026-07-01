@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import fs from "node:fs/promises";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 import { archLog, setArchLogVerbose } from "./log.js";
 import { runStartInit } from "./pipeline.js";
 import { getArchIndexPath } from "./paths.js";
@@ -89,21 +90,25 @@ async function main(): Promise<void> {
   process.exit(await runCli(options));
 }
 
-main().catch((err: unknown) => {
-  const message = err instanceof Error ? err.message : String(err);
-  console.error(message);
-  if (err instanceof Error && err.cause) {
-    console.error("Cause:", err.cause);
-  }
-  if (err instanceof Error && err.stack) {
-    console.error(err.stack);
-  }
+// Only auto-run when executed directly (node dist/cli.js), not when
+// imported (e.g. by tests).
+if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
+  main().catch((err: unknown) => {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error(message);
+    if (err instanceof Error && err.cause) {
+      console.error("Cause:", err.cause);
+    }
+    if (err instanceof Error && err.stack) {
+      console.error(err.stack);
+    }
 
-  if (isEmbeddingError(message)) {
+    if (isEmbeddingError(message)) {
+      process.exit(1);
+    }
+    if (isConfigError(message)) {
+      process.exit(2);
+    }
     process.exit(1);
-  }
-  if (isConfigError(message)) {
-    process.exit(2);
-  }
-  process.exit(1);
-});
+  });
+}

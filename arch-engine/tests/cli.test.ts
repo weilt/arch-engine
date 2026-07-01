@@ -5,8 +5,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { parseCliArgs, runCli } from "../src/cli.js";
 import { getArchIndexPath } from "../src/paths.js";
 
-const runReindexApisMock = vi.fn();
-const runStartInitMock = vi.fn();
+const { runReindexApisMock, runStartInitMock } = vi.hoisted(() => ({
+  runReindexApisMock: vi.fn(),
+  runStartInitMock: vi.fn(),
+}));
 
 vi.mock("../src/reindex/apis.js", () => ({
   runReindexApis: (...args: unknown[]) => runReindexApisMock(...args),
