@@ -161,14 +161,20 @@ describe("runReindexApis", () => {
     const pathRulesPath = path.join(getArchDir(tmpRoot), "path-rules.json");
     const pathRules = JSON.parse(await fs.readFile(pathRulesPath, "utf-8")) as {
       confidence: string;
-      rules: { prefix: string; source: string; controllerPattern: string }[];
+      rules: {
+        prefix: string;
+        source: string;
+        controllerPattern: string;
+        overrides?: string | null;
+      }[];
       sources: string[];
     };
-    expect(pathRules.confidence).toBe("high");
+    expect(pathRules.confidence).toBe("medium");
     const adminRule = pathRules.rules.find((r) => r.prefix === "/admin-api");
     expect(adminRule?.source).toBe("manual");
     expect(adminRule?.controllerPattern).toBe("**.controller.admin.**");
-    expect(pathRules.sources).toContain("manual");
+    expect(adminRule?.overrides).toBeNull();
+    expect(pathRules.sources).toEqual(["manual"]);
 
     const index = JSON.parse(
       await fs.readFile(getArchIndexPath(tmpRoot), "utf-8")
