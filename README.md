@@ -105,7 +105,7 @@ brainstorming → docs/superpowers/specs/*-design.md
 |------|------|
 | **`agent-init`** | 项目初始化：多平台命令/Skills、`AGENTS.md`、`.ai/db.json`、MCP 配置（含 `.codex/config.toml`、`.zcode/mcp.json`） |
 | **`start-init`** | 扫描代码生成 `.ai/arch/`（Markdown + 向量索引） |
-| **`design-sync`** | 将设计真源同步到 `.ai/design/`（`--adapter baoyu`/`html`/`figma`，`--incremental`） |
+| **`design-sync`** | 将设计真源同步到 `.ai/design/`（`--adapter baoyu`/`html`/`figma`/`v0`，`--incremental`） |
 | **`design-bindings`** | 按 Vue/React 框架与 UI 库生成 `framework-bindings.json`（如 element-plus、antd） |
 | **`sync-changes`** | 架构变更批量同步（等同 MCP `sync_arch_changes`） |
 
@@ -153,7 +153,7 @@ Windows 另有同名 `.cmd`（如 `agent-init.cmd`）。安装脚本会把 `~/.a
 - **`search_ui`**：关键词搜索语义组件与页面模板
 - **`report_design_gap`**：缺设计定义时阻塞 UI 实现（对标 `report_missing`）
 - **`/design-system`**：引导定风格 → `design-sync` → `design-bindings`
-- **`/design-page`**：单页 baoyu 原型定稿 → `design-sync --pages-only` → 可选 `design-bindings --check`
+- **`/design-page`**：单页 baoyu 原型定稿 → `design-sync --pages-only`；**v0 多页**见下方[两阶段页面工厂](#两阶段页面工厂v0-多页)
 - **`/feature` §0.5**：含 UI 的任务自动走设计寻址
 
 本仓库自带参考夹具 **`designs/apt-reference-ds/`**（8 语义组件、2 页面配方），狗食测试见 `arch-engine/tests/dogfood/design-workflow.test.ts`。
@@ -166,6 +166,13 @@ design-sync --source designs/my-app
 design-sync --adapter html --source designs/pages/foo.html
 design-sync --adapter figma --source designs/figma-export.json
 
+# v0 页面 handoff（开发 apt-v0-handoff 写完双文件后）
+design-sync --adapter v0 --source designs/v0/user-list
+design-sync --adapter v0 --source designs/v0   # 批量扫描子目录
+
+# Phase A 结束门禁（全部 approved 才允许 plan-from-spec 批量 UI）
+node scripts/check-v0-freeze.mjs
+
 # 增量同步（仅更新变更源文件；无 prior state 时回退全量）
 design-sync --incremental
 
@@ -175,6 +182,32 @@ design-bindings --framework vue --library element-plus
 # 预览
 design-sync --dry-run
 ```
+
+### 两阶段页面工厂（v0 多页）
+
+多页产品（PM 在 v0 出视觉稿）采用 **Phase A → Phase B**，避免批量 UI 在 logic 未冻结时开工。
+
+```text
+Phase A — 页面逻辑冻结（开发，逐页）
+  输入：v0 成品（tsx/链接/截图）+ PM 设计文档（docs/）
+  编排：Codex apt-v0-handoff（或 .agents/skills/apt-v0-handoff/）
+  输出：designs/v0/<page-id>/{page.manifest.json, page.logic.md, page.tsx?}
+  进度：designs/v0/_pages.md（开发维护 SSOT）
+  结束：全部 approved + design-sync --adapter v0
+
+Phase B — 批量开发
+  输入：rollup spec（docs/superpowers/specs/*-pages-rollout-spec.md）
+  编排：/plan-from-spec → 确认 → /implement-plan（串行）→ /verify
+```
+
+| 阶段 | 谁做 | 关键产物 |
+|------|------|----------|
+| **Phase A** | 开发 + `apt-v0-handoff` | 每页 manifest + logic、`approved`、`_pages.md` 全绿 |
+| **Phase B** | plan/implement 子 Agent | 按 rollup spec 串行实现各页 UI + 业务 |
+
+**Phase A 硬门禁：** 在项目根执行 `node scripts/check-v0-freeze.mjs`。脚本读取 `designs/v0/_pages.md`，要求每行 `approved = yes`，且对应目录含 `page.manifest.json` 与 `page.logic.md`。**exit 0（PASS）** 才允许撰写 rollup spec 并跑 `/plan-from-spec` 做全页 UI；**exit 1（FAIL）** 时须先完成 `apt-v0-handoff` 与单页 `design-sync`。
+
+单页、无 rollup 时仍可用 `/feature`；Phase A 未完成时仅允许非 UI 或单页 handoff（见 `templates/feature.md`）。
 
 ### 契约管理（Contract）
 

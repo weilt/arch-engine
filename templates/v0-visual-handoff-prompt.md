@@ -1,6 +1,8 @@
 # v0 视觉伴侣 Prompt（按页生成 Handoff 草稿）
 
-将本模板与页面素材一并交给 Codex / 其它视觉模型。**只写** `designs/v0/<page-id>/` 下文件，**不要**写 `src/` 业务代码。
+> **主路径为开发 `apt-v0-handoff`；本模板为 Agent 内联写字段规则**（非 PM 必跑流程）。
+
+将本模板与页面素材一并交给执行 handoff 的 Agent。**只写** `designs/v0/<page-id>/` 下文件，**不要**写 `src/` 业务代码。
 
 ## 输入
 
@@ -61,11 +63,11 @@ designs/v0/<page-id>/
 
 - 不要生成或修改 `src/` 下生产代码
 - 不要臆造已不存在的 API；未知接口写 `TBD` 并备注
-- 不要直接将 `status` 设为 `approved`（PM 职责）
+- 不要直接将 `status` 设为 `approved`（须开发/TL 对照 PM 文档核对后认定）
 
-## PM 审阅后
+## 开发认定 approved 后
 
-1. 修正 manifest / logic，设 `status: approved`，填 `reviewedBy`、`reviewedAt`
+1. 核对 manifest / logic 与 PM 文档一致，设 `status: approved`，填 `reviewedBy`、`reviewedAt`（开发/TL）
 2. 将 v0 导出的 `page.tsx`（及可选 `preview.html`）放入同目录
-3. 项目根执行：`design-sync --adapter v0 --source designs/v0/<page-id>`
-4. 开发前 Agent 执行：`query_design(page: <page-id>)`；`gaps` 含 `manifest-not-approved` 时须 `report_design_gap`
+3. 项目根执行：`design-sync --adapter v0 --source designs/v0/<page-id>`；更新 `_pages.md`
+4. Phase B 开发前 Agent 执行：`query_design(page: <page-id>)`；`gaps` 含 `manifest-not-approved` 时须 `report_design_gap`
