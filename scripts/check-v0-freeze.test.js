@@ -54,6 +54,26 @@ describe("parsePagesTable", () => {
     assert.equal(rows[1].pageId, "settings");
     assert.equal(rows[1].approved, "NO");
   });
+
+  it("ignores secondary tables like 列说明 in real _pages.md shape", () => {
+    const md = `# v0 页面冻结进度
+
+| page-id | title | handoff | approved | synced | notes |
+|---------|-------|---------|----------|--------|-------|
+| user-list | 用户列表 | pending | no | no | fixture |
+
+**列说明**
+
+| 列 | 含义 |
+|----|------|
+| \`page-id\` | kebab-case |
+| \`approved\` | no | yes |
+`;
+    const rows = parsePagesTable(md);
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0].pageId, "user-list");
+    assert.equal(rows[0].approved, "no");
+  });
 });
 
 describe("checkV0Freeze", () => {
@@ -124,5 +144,16 @@ describe("checkV0Freeze", () => {
       () => execFileSync(process.execPath, [script, failFixture]),
       (err) => err.status === 1
     );
+  });
+
+  it("CLI handles repo _pages.md shape without crashing", () => {
+    const repoRoot = path.resolve(__dirname, "..");
+    try {
+      execFileSync(process.execPath, [script, repoRoot]);
+      assert.fail("expected exit 1");
+    } catch (err) {
+      assert.equal(err.status, 1);
+      assert.match(String(err.stderr), /user-list: approved is "no"/);
+    }
   });
 });

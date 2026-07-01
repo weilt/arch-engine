@@ -41,18 +41,22 @@ export function parsePagesTable(content) {
       const pageIdIdx = cells.indexOf("page-id");
       const approvedIdx = cells.indexOf("approved");
       if (pageIdIdx === -1 || approvedIdx === -1) {
-        throw new Error(
-          "Invalid _pages.md table: missing required columns page-id and/or approved"
-        );
+        continue;
       }
       colIndex = { pageId: pageIdIdx, approved: approvedIdx };
       sawHeader = true;
       continue;
     }
 
+    // Progress table rows must span through the approved column
+    if (cells.length <= colIndex.approved) {
+      break;
+    }
+
     const pageId = cells[colIndex.pageId];
     const approved = cells[colIndex.approved];
     if (!pageId) continue;
+    if (approved === undefined) continue;
 
     rows.push({ pageId, approved });
   }
@@ -104,9 +108,9 @@ export function checkV0Freeze(options = {}) {
   }
 
   for (const { pageId, approved } of rows) {
-    if (approved.toLowerCase() !== "yes") {
+    if (!approved || approved.toLowerCase() !== "yes") {
       errors.push(
-        `${pageId}: approved is "${approved}" (expected yes)`
+        `${pageId}: approved is "${approved ?? ""}" (expected yes)`
       );
     }
 
