@@ -11,11 +11,13 @@ const PUBLIC_TEMPLATES = new Set([
   "verify.md",
   "finish-feature.md",
   "design-system.md",
- "design-page.md",
+  "design-page.md",
   "apt-goal.md",
   "auto-brainstorm.md",
   "current-status.md",
 ]);
+
+const EXTRA_SKILLS = new Set(["apt-v0-handoff"]);
 
 function parseFrontmatter(content) {
   const normalized = content.replace(/\r\n/g, "\n");
@@ -156,6 +158,24 @@ function injectPlatformAssets(projectRoot, aptHome) {
     );
   }
 
+  const extraSkillsDir = path.join(templatesDir, ".agents", "skills");
+  for (const skillName of EXTRA_SKILLS) {
+    const srcPath = path.join(extraSkillsDir, skillName, "SKILL.md");
+    if (!fs.existsSync(srcPath)) {
+      console.warn("WARN: extra skill not found: " + srcPath);
+      continue;
+    }
+    const skillContent = fs.readFileSync(srcPath, "utf8");
+
+    const skillDir = path.join(skillsRoot, skillName);
+    fs.mkdirSync(skillDir, { recursive: true });
+    fs.writeFileSync(path.join(skillDir, "SKILL.md"), skillContent);
+
+    const zcodeSkillDir = path.join(zcodeSkillsRoot, skillName);
+    fs.mkdirSync(zcodeSkillDir, { recursive: true });
+    fs.writeFileSync(path.join(zcodeSkillDir, "SKILL.md"), skillContent);
+  }
+
   console.log("OK " + claudeDir);
   console.log("OK " + qoderDir);
   console.log("OK " + zcodeCommandsDir);
@@ -198,4 +218,5 @@ module.exports = {
   injectPlatformAssets,
   extractWorkflowBlock,
   PUBLIC_TEMPLATES,
+  EXTRA_SKILLS,
 };

@@ -12,6 +12,7 @@ const {
   injectPlatformAssets,
   injectAgentsMd,
   PUBLIC_TEMPLATES,
+  EXTRA_SKILLS,
 } = require("./inject-platform-assets.cjs");
 
 const SAMPLE = `---
@@ -62,6 +63,11 @@ describe("inject-platform-assets", () => {
   it("PUBLIC_TEMPLATES has ten entries", () => {
     assert.equal(PUBLIC_TEMPLATES.size, 10);
   });
+
+  it("EXTRA_SKILLS is separate from PUBLIC_TEMPLATES", () => {
+    assert.equal(EXTRA_SKILLS.size, 1);
+    assert.ok(EXTRA_SKILLS.has("apt-v0-handoff"));
+  });
 });
 
 describe("injectPlatformAssets integration", () => {
@@ -86,6 +92,13 @@ describe("injectPlatformAssets integration", () => {
         `---\ndescription: ${name}\nmodel: sonnet\n---\n\n${name} body\n`
       );
     }
+
+    const extraSkillDir = path.join(templatesDir, ".agents", "skills", "apt-v0-handoff");
+    fs.mkdirSync(extraSkillDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(extraSkillDir, "SKILL.md"),
+      "---\nname: apt-v0-handoff\ndescription: v0 handoff skill\n---\n\nExtra skill body\n"
+    );
   });
 
   after(() => {
@@ -134,14 +147,34 @@ describe("injectPlatformAssets integration", () => {
       fs.readdirSync(path.join(projectRoot, ".zcode", "commands")).length,
       10
     );
+    const expectedSkillCount = PUBLIC_TEMPLATES.size + EXTRA_SKILLS.size;
     assert.equal(
       fs.readdirSync(path.join(projectRoot, ".agents", "skills")).length,
-      10
+      expectedSkillCount
     );
     assert.equal(
       fs.readdirSync(path.join(projectRoot, ".zcode", "skills")).length,
-      10
+      expectedSkillCount
     );
+
+    const extraSkillPath = path.join(
+      projectRoot,
+      ".agents",
+      "skills",
+      "apt-v0-handoff",
+      "SKILL.md"
+    );
+    assert.ok(fs.existsSync(extraSkillPath));
+    const extraSkill = fs.readFileSync(extraSkillPath, "utf8");
+    assert.match(extraSkill, /name: apt-v0-handoff/);
+    assert.match(extraSkill, /Extra skill body/);
+
+    const zcodeExtraSkill = fs.readFileSync(
+      path.join(projectRoot, ".zcode", "skills", "apt-v0-handoff", "SKILL.md"),
+      "utf8"
+    );
+    assert.match(zcodeExtraSkill, /name: apt-v0-handoff/);
+
     assert(!fs.existsSync(path.join(projectRoot, ".claude", "commands", "_feature-closeout.md")));
   });
 
