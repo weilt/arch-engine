@@ -1,4 +1,11 @@
-export type ArchNodeKind = "root" | "module" | "api-doc" | "component-doc" | "package";
+export type ArchNodeKind =
+  | "root"
+  | "module"
+  | "api-doc"
+  | "component-doc"
+  | "package"
+  | "entity-doc"
+  | "flow-doc";
 
 export interface ApiEndpoint {
   id: string;
@@ -25,6 +32,12 @@ export interface FrontendSymbol {
   file: string;
   description: string;
   exports: string[];
+  /** Component template tags (PascalCase / library-prefixed) from a .vue SFC. */
+  related?: string[];
+  /** Component prop names extracted from a .vue SFC contract. */
+  props?: string[];
+  /** Component emit names extracted from a .vue SFC contract. */
+  emits?: string[];
 }
 
 export interface FrontendEnum {
@@ -42,6 +55,34 @@ export interface FrontendPackage {
   components: FrontendSymbol[];
   utils: FrontendSymbol[];
   enums: FrontendEnum[];
+  apiClients?: ApiClientContract[];
+  routes?: RouteEntry[];
+  stores?: StoreContract[];
+}
+
+export interface ApiClientContract {
+  name: string;
+  file: string;
+  description: string;
+  endpoints: { method: "GET" | "POST" | "PUT" | "DELETE" | "PATCH"; path: string }[];
+}
+
+export interface RouteEntry {
+  path: string;
+  name?: string;
+  component?: string;
+  meta?: Record<string, unknown>;
+  children?: RouteEntry[];
+}
+
+export interface StoreContract {
+  name: string;
+  storeId?: string;
+  file: string;
+  description: string;
+  state: string[];
+  getters: string[];
+  actions: string[];
 }
 
 export interface JavaModule {
@@ -57,6 +98,76 @@ export interface DocumentModel {
   packages: FrontendPackage[];
   /** Backend AssetCards written to utils/enums/pojo md (optional, SA-1+). */
   assetCards?: AssetCard[];
+  /** Entity graph (JPA/MyBatis/SQL) for v2.0.3 entity layer. */
+  entities?: EntityGraph;
+  /** Flow graph across backend/frontend layers for v2.0.3 flow layer. */
+  flows?: FlowGraph;
+}
+
+export interface EntityField {
+  name: string;
+  type: string;
+  column?: string;
+  nullable?: boolean;
+}
+
+export interface EntityDef {
+  name: string;
+  table: string;
+  moduleSlug: string;
+  filePath: string;
+  fields: EntityField[];
+  source: "jpa" | "mybatis" | "sql";
+}
+
+export type EntityRelationKind =
+  | "one-to-many"
+  | "many-to-one"
+  | "one-to-one"
+  | "many-to-many"
+  | "fk-reference";
+
+export interface EntityRelation {
+  from: string;
+  to: string;
+  kind: EntityRelationKind;
+  field?: string;
+  source: "jpa" | "mybatis" | "sql";
+}
+
+export interface EntityGraph {
+  entities: EntityDef[];
+  relations: EntityRelation[];
+}
+
+export type FlowLayer =
+  | "entity"
+  | "repository"
+  | "service"
+  | "controller"
+  | "api-client"
+  | "route"
+  | "store"
+  | "rpc";
+
+export interface FlowNode {
+  id: string;
+  layer: FlowLayer;
+  name: string;
+  filePath?: string;
+  moduleSlug?: string;
+}
+
+export interface FlowEdge {
+  from: string;
+  to: string;
+  label?: string;
+  confidence: "high" | "low";
+}
+
+export interface FlowGraph {
+  nodes: FlowNode[];
+  edges: FlowEdge[];
 }
 
 export type AssetKind =
@@ -67,7 +178,10 @@ export type AssetKind =
   | "enum"
   | "starter"
   | "pojo"
-  | "contract";
+  | "contract"
+  | "api-client"
+  | "route"
+  | "store";
 
 export interface AssetCard {
   id: string;
@@ -108,7 +222,10 @@ export interface ArchChunk {
     | "overview"
     | "convention"
     | "starter"
-    | "pojo";
+    | "pojo"
+    | "api-client"
+    | "route"
+    | "store";
   title: string;
   text: string;
 }
@@ -177,7 +294,11 @@ export interface ArchConfig {
     summarizeJsonMode?: boolean;
   };
   apiSpecGlobs: string[];
-  /** Optional glob patterns for design-system / UI base packages (e.g. "@star/ui"). */
-  designSystemPackages?: string[];
-  scanners: { java: boolean; frontend: boolean };
+ /** Optional glob patterns for design-system / UI base packages (e.g. "@star/ui"). */
+ designSystemPackages?: string[];
+  /** Optional glob patterns for frontend app packages not at the JS repo root (e.g. "web", "admin-ui"). */
+  frontendPackages?: string[];
+  /** Optional manually-declared project metadata for ontology snapshot (v2.0.2). */
+  projectMeta?: { name?: string; techStack?: string[] } | null;
+ scanners: { java: boolean; frontend: boolean };
 }

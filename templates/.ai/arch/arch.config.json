@@ -1,0 +1,24 @@
+{
+  "embedding": {
+    "baseUrl": "https://api.openai.com/v1",
+    "apiKeyEnv": "OPENAI_API_KEY",
+    "model": "text-embedding-3-small"
+  },
+  "chunking": {
+    "baseUrl": "https://api.openai.com/v1",
+    "apiKeyEnv": "OPENAI_API_KEY",
+    "chatModel": "gpt-4o-mini",
+    "maxChunkTokens": 800,
+    "strategy": "semantic-only"
+  },
+  "apiSpecGlobs": [
+    "docs/**/*.json",
+    "**/openapi.json",
+    "**/swagger.json"
+  ],
+  "designSystemPackages": [],
+  "scanners": {
+    "java": true,
+    "frontend": true
+  }
+}

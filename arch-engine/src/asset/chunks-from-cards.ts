@@ -10,6 +10,9 @@ const CHUNK_KINDS: Set<AssetKind> = new Set([
   "enum",
   "starter",
   "pojo",
+  "api-client",
+  "route",
+  "store",
 ]);
 
 function toChunkKind(kind: AssetKind): ArchChunk["kind"] {

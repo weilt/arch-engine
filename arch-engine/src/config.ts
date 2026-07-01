@@ -17,8 +17,10 @@ export const DEFAULT_CONFIG: ArchConfig = {
     strategy: "semantic-only",
   },
   apiSpecGlobs: ["docs/**/*.json", "**/openapi.json", "**/swagger.json"],
-  designSystemPackages: [],
-  scanners: { java: true, frontend: true },
+ designSystemPackages: [],
+  frontendPackages: [],
+  projectMeta: null,
+ scanners: { java: true, frontend: true },
 };
 
 /** Optional overlay: only apiKey fields are merged from arch.secrets.json */

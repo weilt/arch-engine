@@ -99,4 +99,8 @@ describe("arch config", () => {
 
     delete process.env[envName];
   });
+
+  it("DEFAULT_CONFIG exposes projectMeta as null", () => {
+    expect(DEFAULT_CONFIG.projectMeta).toBeNull();
+  });
 });

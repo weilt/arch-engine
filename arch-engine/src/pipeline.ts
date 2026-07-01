@@ -32,10 +32,14 @@ import {
 import { resolveJavaPathRules } from "./scanners/java-path-rules.js";
 import { mergeDocumentModel } from "./scanners/merge.js";
 import { scanOpenApiGlobs } from "./scanners/openapi.js";
+import { mergeEntityGraphs } from "./scanners/entity-merge.js";
+import { createScannerRegistry, type ScannerContext } from "./scanners/registry.js";
 import type {
   ArchChunk,
   ArchConfig,
   AssetCard,
+  EntityDef,
+  EntityRelation,
   FrontendPackage,
   JavaModule,
   LastScanState,
@@ -58,6 +62,8 @@ import {
   type ArchIndex,
 } from "./writer/index.js";
 import { writeModuleAssetDocs } from "./writer/asset-md.js";
+import { writeEntityDocs } from "./writer/entity-md.js";
+import { writeFlowDocs } from "./writer/flow-md.js";
 import { buildDesignArchAlignment } from "./design/alignment.js";
 import { getDesignProfilePath } from "./design/paths.js";
 
@@ -69,6 +75,28 @@ export type StartInitReport =
       apiCount: number;
       moduleCount: number;
     };
+
+// Slugify a package.json "name" the same way frontend.ts slugFromPackageName
+// does, so the pipeline and scanner agree on package identity.
+function slugFromPkgName(name: string): string {
+  const base = name.includes("/") ? name.split("/").pop()! : name;
+  return base.toLowerCase().replace(/[^a-z0-9-]/gi, "-");
+}
+
+// P1: detect units (frontend packages or backend modules) that exist in the
+// current scan but were absent from the previous scan, so they are rescanned
+// even when no changed file maps to them yet.
+export function detectNewUnits(
+  currentSlugs: Iterable<string>,
+  previousSlugs: Iterable<string>
+): Set<string> {
+  const previous = new Set(previousSlugs);
+  const added = new Set<string>();
+  for (const slug of currentSlugs) {
+    if (!previous.has(slug)) added.add(slug);
+  }
+  return added;
+}
 
 export interface PipelineDeps {
   summarizeFn?: SummarizeFn;
@@ -136,9 +164,31 @@ async function readOverviewMarkdowns(
 }
 
 async function resolveFrontendPackageDirs(
-  projectRoot: string
+  projectRoot: string,
+  frontendPackages?: string[]
 ): Promise<Map<string, string>> {
   const dirs = new Map<string, string>();
+
+  // P2: an explicit config.frontendPackages list takes priority over workspace
+  // probing, so non-JS-root projects (frontend in a subdir like "web/") can be
+  // declared instead of auto-detected.
+  if (frontendPackages && frontendPackages.length > 0) {
+    archLog.info("start-init: resolving frontendPackages from config", {
+      frontendPackages,
+    });
+    for (const entry of frontendPackages) {
+      const resolved = path.isAbsolute(entry) ? entry : path.resolve(projectRoot, entry);
+      try {
+        const raw = await fs.readFile(path.join(resolved, "package.json"), "utf-8");
+        const pkg = JSON.parse(raw) as { name?: string };
+        if (!pkg.name) continue;
+        dirs.set(slugFromPkgName(pkg.name), resolved);
+      } catch {
+        // skip missing or invalid frontend package dir
+      }
+    }
+    return dirs;
+  }
 
   let patterns: string[] = [];
   const pnpmWorkspace = path.join(projectRoot, "pnpm-workspace.yaml");
@@ -190,9 +240,7 @@ async function resolveFrontendPackageDirs(
       const raw = await fs.readFile(pkgJsonPath, "utf-8");
       const pkg = JSON.parse(raw) as { name?: string };
       if (!pkg.name) continue;
-      const base = pkg.name.includes("/") ? pkg.name.split("/").pop()! : pkg.name;
-      const slug = base.toLowerCase().replace(/[^a-z0-9-]/gi, "-");
-      dirs.set(slug, path.dirname(pkgJsonPath));
+      dirs.set(slugFromPkgName(pkg.name), path.dirname(pkgJsonPath));
     } catch {
       // skip invalid package.json
     }
@@ -384,6 +432,78 @@ export async function runStartInit(
     incremental,
   });
 
+  // v2.0.4: Entity + Flow scanning via Scanner Registry
+  const entityNames = new Set<string>();
+  if (config.scanners.java) {
+    const registry = createScannerRegistry();
+    const ctx: ScannerContext = { projectRoot, modules, model };
+
+    // Entity phase: collect results from all entity-phase plugins
+    const entityResults: Record<string, { entities: EntityDef[]; relations: EntityRelation[] }> = {};
+    for (const plugin of registry) {
+      if (plugin.phase !== "entity") continue;
+      try {
+        const result = await plugin.scan(ctx);
+        if (result.entities?.entities) {
+          entityResults[plugin.name] = {
+            entities: result.entities.entities,
+            relations: result.entities.relations ?? [],
+          };
+        }
+      } catch (e) {
+        archLog.warn(`start-init: ${plugin.name} failed (non-fatal)`, {
+          error: e instanceof Error ? e.message : String(e),
+        });
+      }
+    }
+
+    // Merge entity graphs (JPA > MyBatis > SQL)
+    try {
+      const merged = mergeEntityGraphs(
+        entityResults["entity-jpa"] ?? { entities: [], relations: [] },
+        entityResults["entity-mybatis"] ?? { entities: [], relations: [] },
+        entityResults["entity-sql"] ?? { entities: [], relations: [] },
+      );
+      if (merged.entities.length > 0) {
+        model.entities = merged;
+        for (const e of merged.entities) entityNames.add(e.name);
+        archLog.info("start-init: entity scan complete", {
+          entities: merged.entities.length,
+          relations: merged.relations.length,
+        });
+      }
+    } catch (e) {
+      archLog.warn("start-init: entity merge failed (non-fatal)", {
+        error: e instanceof Error ? e.message : String(e),
+      });
+    }
+
+    // Flow phase: run flow-phase plugins with entityNames populated
+    if (entityNames.size > 0) {
+      const flowCtx: ScannerContext = { ...ctx, entityNames: [...entityNames] };
+      for (const plugin of registry) {
+        if (plugin.phase !== "flow") continue;
+        try {
+          const result = await plugin.scan(flowCtx);
+          if (result.flows?.nodes && result.flows.nodes.length > 0) {
+            model.flows = {
+              nodes: result.flows.nodes,
+              edges: result.flows.edges ?? [],
+            };
+            archLog.info(`start-init: ${plugin.name} complete`, {
+              nodes: model.flows.nodes.length,
+              edges: model.flows.edges.length,
+            });
+          }
+        } catch (e) {
+          archLog.warn(`start-init: ${plugin.name} failed (non-fatal)`, {
+            error: e instanceof Error ? e.message : String(e),
+          });
+        }
+      }
+    }
+  }
+
   if (!incremental) {
     archLog.info("start-init: writing base markdown and index");
     await writeMarkdownTree(projectRoot, model);
@@ -392,7 +512,7 @@ export async function runStartInit(
   }
 
   const packageDirs = config.scanners.frontend
-    ? await resolveFrontendPackageDirs(projectRoot)
+    ? await resolveFrontendPackageDirs(projectRoot, config.frontendPackages)
     : new Map<string, string>();
 
   if (incremental && previousScan) {
@@ -405,10 +525,25 @@ export async function runStartInit(
         packageDirs,
         projectRoot
       );
+      // P1: a newly added package/module has no entry in the previous scan, so
+      // git diff cannot map any changed file onto it. Pull in any unit present
+      // now but absent from previousScan so it still gets scanned.
+      const newPackageSlugs = detectNewUnits(
+        packageDirs.keys(),
+        Object.keys(previousScan.packages)
+      );
+      for (const slug of newPackageSlugs) affectedPackages.add(slug);
+      const newModuleSlugs = detectNewUnits(
+        model.modules.map((m) => m.slug),
+        Object.keys(previousScan.modules)
+      );
+      for (const slug of newModuleSlugs) affectedModules.add(slug);
       archLog.info("start-init: incremental mode", {
         changedFiles: changed.length,
         affectedModules: [...affectedModules],
         affectedPackages: [...affectedPackages],
+        newPackages: newPackageSlugs.size,
+        newModules: newModuleSlugs.size,
       });
     } catch (e) {
       if (e instanceof GitDiffError) {
@@ -547,6 +682,26 @@ export async function runStartInit(
       affectedPrefixes
     );
     await writeIndexMd(projectRoot, updatedIndex);
+  }
+
+  // v2.0.3: persist entity/flow docs after the markdown index is final.
+  if (model.entities) {
+    try {
+      await writeEntityDocs(projectRoot, model.entities);
+    } catch (e) {
+      archLog.warn("start-init: entity doc write failed", {
+        error: e instanceof Error ? e.message : String(e),
+      });
+    }
+  }
+  if (model.flows) {
+    try {
+      await writeFlowDocs(projectRoot, model.flows);
+    } catch (e) {
+      archLog.warn("start-init: flow doc write failed", {
+        error: e instanceof Error ? e.message : String(e),
+      });
+    }
   }
 
   const fileHashMap = await collectTrackedSourceHashes(

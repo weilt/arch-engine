@@ -9,6 +9,17 @@ export type {
   ArchIndexNode,
   ArchConfig,
 } from "./types.js";
+export type {
+  EntityGraph,
+  EntityDef,
+  EntityField,
+  EntityRelation,
+  EntityRelationKind,
+  FlowGraph,
+  FlowNode,
+  FlowEdge,
+  FlowLayer,
+} from "./types.js";
 
 export {
   getArchDir,
@@ -32,6 +43,12 @@ export { scanFrontend } from "./scanners/frontend.js";
 
 export { mergeDocumentModel } from "./scanners/merge.js";
 
+export { scanJpaEntities } from "./scanners/entity-jpa.js";
+export { scanMybatisEntities } from "./scanners/entity-mybatis.js";
+export { scanSqlEntities } from "./scanners/entity-sql.js";
+export { mergeEntityGraphs } from "./scanners/entity-merge.js";
+export { deriveFlowGraph } from "./scanners/flow-scanner.js";
+
 export {
   writeMarkdownTree,
   buildArchIndex,
@@ -42,6 +59,9 @@ export {
   writeIndexMd,
   type ArchIndex,
 } from "./writer/index.js";
+
+export { writeEntityDocs } from "./writer/entity-md.js";
+export { writeFlowDocs } from "./writer/flow-md.js";
 
 export { VectorStore, type SearchHit } from "./vector/sqlite-store.js";
 

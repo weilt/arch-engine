@@ -11,7 +11,10 @@ const PUBLIC_TEMPLATES = new Set([
   "verify.md",
   "finish-feature.md",
   "design-system.md",
-  "design-page.md",
+ "design-page.md",
+  "apt-goal.md",
+  "auto-brainstorm.md",
+  "current-status.md",
 ]);
 
 function parseFrontmatter(content) {
@@ -52,7 +55,7 @@ function buildQoderCommand(content) {
 
 function skillNameFromFile(filename) {
   const slug = filename.replace(/\.md$/, "");
-  return `apt-${slug}`;
+  return slug.startsWith("apt-") ? slug : `apt-${slug}`;
 }
 
 function buildCodexSkill(filename, content) {

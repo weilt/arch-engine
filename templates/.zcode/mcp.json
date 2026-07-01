@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "agent-protocol-mcp": {
+      "type": "stdio",
+      "command": "node",
+      "args": [
+        "C:\\Users\\weilt\\.apt\\mcp-server\\dist\\index.js"
+      ],
+      "env": {
+        "APT_PROJECT_ROOT": "D:\\software\\arch-engine\\templates"
+      }
+    }
+  }
+}

@@ -4,12 +4,20 @@ import fg from "fast-glob";
 import { parse as parseYaml } from "yaml";
 import type {
   FrontendEnum,
+  ApiClientContract,
+  RouteEntry,
+  StoreContract,
   FrontendPackage,
   FrontendSymbol,
   RawCandidate,
 } from "../types.js";
 import { discoverExports } from "./ts-export.js";
 import { extractFromSource, extractVueScript } from "./ts-doc.js";
+import { archLog } from "../log.js";
+import { extractApiClients, isApiClientFile } from "./frontend-api.js";
+import { extractRoutes, isRouterFile } from "./frontend-router.js";
+import { extractStores, isStoreFile } from "./frontend-store.js";
+import { extractVueContract } from "./frontend-vue-contract.js";
 
 interface PackageJson {
   name?: string;
@@ -19,7 +27,7 @@ interface PackageJson {
   workspaces?: string[] | { packages?: string[] };
 }
 
-const SOURCE_GLOBS = ["src/**/*.{ts,tsx,vue}"];
+const SOURCE_GLOBS = ["src/**/*.{ts,tsx,js,jsx,mjs,vue}"];
 
 async function readJson<T>(filePath: string): Promise<T | null> {
   try {
@@ -191,10 +199,13 @@ async function scanPackageDir(
   const moduleSlug = slugFromPackageName(pkg.name);
   const files = await collectSourceFiles(pkgDir);
 
-  const components: FrontendSymbol[] = [];
-  const utils: FrontendSymbol[] = [];
-  const enums: FrontendEnum[] = [];
-  const seenComponentFiles = new Set<string>();
+ const components: FrontendSymbol[] = [];
+ const utils: FrontendSymbol[] = [];
+ const enums: FrontendEnum[] = [];
+ const apiClients: ApiClientContract[] = [];
+ const routes: RouteEntry[] = [];
+ const stores: StoreContract[] = [];
+const seenComponentFiles = new Set<string>();
   const seenUtilFiles = new Set<string>();
   const seenEnumKeys = new Set<string>();
 
@@ -207,7 +218,25 @@ async function scanPackageDir(
       const hints = fileKindHints(discovered);
 
       if (hints.has("component") && !seenComponentFiles.has(relativeFile)) {
-        components.push(buildFrontendSymbol(relativeFile, doc));
+        const sym = buildFrontendSymbol(relativeFile, doc);
+        // For .vue SFCs, enrich the component with the structured contract
+        // (props/emits/templateTags) extracted from the RAW SFC text. The loop
+        // variable `content` is the script-stripped text, so we re-read the raw
+        // file here; extractVueContract needs the full SFC (template + script).
+        if (relativeFile.toLowerCase().endsWith(".vue")) {
+          try {
+            const rawSfc = await fs.readFile(path.join(pkgDir, relativeFile), "utf-8");
+            const vc = extractVueContract(rawSfc);
+            if (vc) {
+              if (vc.templateTags.length > 0) sym.related = vc.templateTags;
+              if (vc.props.length > 0) sym.props = vc.props;
+              if (vc.emits.length > 0) sym.emits = vc.emits;
+            }
+          } catch {
+            // raw SFC unreadable: leave the symbol registered but unenriched
+          }
+        }
+        components.push(sym);
         seenComponentFiles.add(relativeFile);
       }
 
@@ -221,10 +250,21 @@ async function scanPackageDir(
           const key = `${relativeFile}:${exportItem.name}`;
           if (seenEnumKeys.has(key)) continue;
           enums.push(buildFrontendEnum(relativeFile, doc, exportItem.name));
-          seenEnumKeys.add(key);
-        }
-      }
+         seenEnumKeys.add(key);
+       }
+     }
 
+      if (isApiClientFile(content)) {
+       apiClients.push(...extractApiClients(content, relativeFile));
+     }
+
+      if (isRouterFile(content)) {
+        routes.push(...extractRoutes(content));
+      }
+      if (isStoreFile(content)) {
+        stores.push(...extractStores(content, relativeFile));
+      }
+ 
       if (discovered.length === 0 && doc.enums.length > 0) {
         for (const enumDoc of doc.enums) {
           const key = `${relativeFile}:${enumDoc.name}`;
@@ -246,6 +286,9 @@ async function scanPackageDir(
   components.sort((a, b) => a.name.localeCompare(b.name));
   utils.sort((a, b) => a.name.localeCompare(b.name));
   enums.sort((a, b) => a.name.localeCompare(b.name));
+ apiClients.sort((a, b) => a.name.localeCompare(b.name));
+ routes.sort((a, b) => a.path.localeCompare(b.path));
+ stores.sort((a, b) => a.name.localeCompare(b.name));
 
   return {
     slug: moduleSlug,
@@ -253,9 +296,12 @@ async function scanPackageDir(
     description: pkg.description ?? "",
     framework: inferFramework(pkg),
     components,
-    utils,
-    enums,
-  };
+   utils,
+   enums,
+   apiClients,
+   routes,
+   stores,
+};
 }
 
 function workspacePackageJsonGlobs(patterns: string[]): string[] {
@@ -267,14 +313,58 @@ function workspacePackageJsonGlobs(patterns: string[]): string[] {
   });
 }
 
+// P2: auto-discover frontend packages living in a non-JS repo root. When the
+// workspace probe is empty and there is no root package.json, scan the root's
+// direct child directories for any that hold a package.json with frontend deps
+// (vue/react), so a project whose frontend lives under e.g. "web/" is not
+// silently skipped.
+async function discoverChildFrontendPackages(
+  projectRoot: string
+): Promise<FrontendPackage[]> {
+  let entries;
+  try {
+    entries = await fs.readdir(projectRoot, { withFileTypes: true });
+  } catch {
+    return [];
+  }
+
+  const packages: FrontendPackage[] = [];
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue;
+    if (entry.name === "node_modules" || entry.name.startsWith(".")) continue;
+    const childDir = path.join(projectRoot, entry.name);
+    const pkg = await readJson<PackageJson>(path.join(childDir, "package.json"));
+    if (!pkg?.name) continue;
+    if (!inferFramework(pkg)) continue;
+    const scanned = await scanPackageDir(projectRoot, childDir);
+    if (scanned) packages.push(scanned);
+  }
+
+  packages.sort((a, b) => a.slug.localeCompare(b.slug));
+  return packages;
+}
+
 export async function scanFrontend(projectRoot: string): Promise<FrontendPackage[]> {
   const patterns = await getWorkspacePatterns(projectRoot);
 
   if (patterns.length === 0) {
     const rootPkg = await readJson<PackageJson>(path.join(projectRoot, "package.json"));
-    if (!rootPkg?.name) return [];
-    const pkg = await scanPackageDir(projectRoot, projectRoot);
-    return pkg ? [pkg] : [];
+    if (rootPkg?.name) {
+      const pkg = await scanPackageDir(projectRoot, projectRoot);
+      return pkg ? [pkg] : [];
+    }
+    // Non-JS repo root: auto-discover direct child frontend packages.
+    const discovered = await discoverChildFrontendPackages(projectRoot);
+    if (discovered.length > 0) {
+      archLog.info("frontend: discovered non-root frontend packages", {
+        slugs: discovered.map((p) => p.slug),
+      });
+      return discovered;
+    }
+    archLog.warn(
+      "frontend: no workspace, no root package.json, and no frontend child packages discovered"
+    );
+    return [];
   }
 
   const pkgJsonPaths = await fg.glob(workspacePackageJsonGlobs(patterns), {

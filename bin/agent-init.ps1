@@ -13,6 +13,37 @@ if (-not (Test-Path $db)) {
   )
 }
 
+New-Item -ItemType Directory -Force -Path (Join-Path $target ".apt") | Out-Null
+New-Item -ItemType Directory -Force -Path (Join-Path $target ".apt\verify") | Out-Null
+
+$statusPath = Join-Path $target ".apt\status.json"
+if (-not (Test-Path $statusPath)) {
+  $iso = (Get-Date).ToUniversalTime().ToString("o")
+  [System.IO.File]::WriteAllText(
+    $statusPath,
+    "{""phase"":""idle"",""loopDone"":false,""updatedAt"":""$iso""}",
+    [System.Text.UTF8Encoding]::new($false)
+  )
+}
+
+$approvalsPath = Join-Path $target ".apt\approvals.json"
+if (-not (Test-Path $approvalsPath)) {
+  [System.IO.File]::WriteAllText(
+    $approvalsPath,
+    '[]',
+    [System.Text.UTF8Encoding]::new($false)
+  )
+}
+
+$goalPath = Join-Path $target ".apt\goal.md"
+if (-not (Test-Path $goalPath)) {
+  [System.IO.File]::WriteAllText(
+    $goalPath,
+    '<!-- /apt-goal will overwrite this with the product goal. Do not delete. -->' + "`n",
+    [System.Text.UTF8Encoding]::new($false)
+  )
+}
+
 $inject = Join-Path $aptHome "scripts\inject-platform-assets.cjs"
 $mcpEntry = Join-Path $aptHome "mcp-server\dist\index.js"
 $writeMcp = Join-Path $aptHome "scripts\write-project-mcp-json.cjs"

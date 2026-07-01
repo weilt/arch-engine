@@ -17,6 +17,9 @@ import { handleSearchUi } from "./design-search.js";
 import { handleReportDesignGap } from "./design-gap.js";
 import { handleRegisterUiPattern } from "./design-register.js";
 import { handleAuditDesignChanges } from "./design-audit.js";
+import { handleQueryProjectStatus } from "./status/aggregate.js";
+import { handleQueryOntology } from "./ontology-query.js";
+import { handleQueryImpact } from "./impact-query.js";
 
 const projectRoot = getProjectRoot();
 
@@ -491,6 +494,63 @@ server.tool(
             text: "🚫 TASK BLOCKED. Missing dependency reported to Manager Agent. Stop current work immediately and wait for resolution.",
           },
         ],
+      };
+    } catch (err) {
+      return {
+        content: [{ type: "text" as const, text: String(err) }],
+        isError: true,
+      };
+    }
+  }
+);
+
+server.tool(
+  "query_project_status",
+  "Aggregate APT autonomous-loop status: phase, loopDone, nextAction (read-only)",
+  {},
+  async () => {
+  try {
+    const r = await handleQueryProjectStatus(projectRoot);
+    return {
+      content: [{ type: "text" as const, text: JSON.stringify(r, null, 2) }],
+    };
+  } catch (err) {
+    return {
+      content: [{ type: "text" as const, text: "Error: " + String(err) }],
+      isError: true,
+    };
+  }
+}
+);
+
+server.tool(
+  "query_ontology",
+  "Query project ontology: no-arg = project snapshot (status/modules/packages/contracts/design/progress); with topic = focused retrieval (assets/contracts/designPages). Read-only. Use during brainstorming to ground design in the project's real state.",
+  { topic: z.string().optional().describe("Topic to focus on (e.g. auth, Order). Omit for a full project snapshot.") },
+  async ({ topic }) => {
+    try {
+      const result = await handleQueryOntology(projectRoot, topic);
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+      };
+    } catch (err) {
+      return {
+        content: [{ type: "text" as const, text: String(err) }],
+        isError: true,
+      };
+    }
+  }
+);
+
+server.tool(
+  "query_impact",
+  "Query what layers reference a given entity (repository/service/controller/frontend). Read-only impact analysis for change-scoping.",
+  { entity: z.string().describe("Entity class name, e.g. Order") },
+  async ({ entity }) => {
+    try {
+      const result = await handleQueryImpact(projectRoot, entity);
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
       };
     } catch (err) {
       return {

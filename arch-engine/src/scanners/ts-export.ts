@@ -90,7 +90,12 @@ export function discoverExports(fileContent: string, filePath: string): Discover
   if (
     isComponentFile(filePath) &&
     results.length === 0 &&
-    (/<script[\s>]/i.test(content) || content.includes("defineProps"))
+    // P0-1: callers pass the *stripped* script text for `.vue` files (see
+    // extractVueScript in ts-doc.ts), so the `<script` tag is already gone and
+    // a `<script setup>` SFC with no defineProps used to register zero exports.
+    // A `.vue` file is a single-file component by definition, so key the
+    // fallback off the file extension, not the (already-stripped) content.
+    filePath.replace(/\\/g, "/").toLowerCase().endsWith(".vue")
   ) {
     pushUnique(results, { name: pathBaseName(filePath), kindHint: "component" });
   }

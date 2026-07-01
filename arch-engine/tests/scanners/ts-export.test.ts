@@ -73,3 +73,38 @@ defineProps<{ title: string }>();
     expect(exports.some((e) => e.kindHint === "component")).toBe(true);
   });
 });
+describe("discoverExports P0-1 (script setup SFC)", () => {
+  it("registers a stripped <script setup> SFC without defineProps as a component", () => {
+    // Production callers (frontend.ts readSourceContent) pass the STRIPPED
+    // script text from ts-doc.extractVueScript for .vue files, so the <script>
+    // tag is already gone. The fix keys off the .vue extension.
+    const strippedScript = [
+      'import { ref } from "vue";',
+      "const count = ref(0);",
+      "",
+    ].join("\n");
+    const exports = discoverExports(strippedScript, "src/components/Counter.vue");
+    expect(exports).toContainEqual({ name: "Counter", kindHint: "component" });
+  });
+  it("registers a raw <script setup> SFC without defineProps as a component", () => {
+    const source = [
+      "<script setup lang=\"ts\">",
+      'import { ref } from "vue";',
+      "const count = ref(0);",
+      "<\/script>",
+      "<template><button>{{ count }}</button></template>",
+      "",
+    ].join("\n");
+    const exports = discoverExports(source, "src/components/Counter.vue");
+    expect(exports.some((e) => e.kindHint === "component")).toBe(true);
+  });
+  it("still registers a .vue SFC with defineProps from stripped script", () => {
+    const strippedScript = "defineProps<{ title: string; visible: boolean }>();";
+    const exports = discoverExports(strippedScript, "src/components/PageHeader.vue");
+    expect(exports.some((e) => e.kindHint === "component")).toBe(true);
+  });
+  it("does not register an empty .tsx file as a component (tsx path unchanged)", () => {
+    const exports = discoverExports("// nothing exported\n", "src/components/Empty.tsx");
+    expect(exports).toEqual([]);
+  });
+});
