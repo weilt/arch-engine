@@ -1,33 +1,37 @@
-# Task 4 Report — rollup spec 与 plan/feature 模板
+# Task 4 Report — runReindexApis core
 
-**Status:** DONE  
-**BASE_SHA:** `62b0591`（Task 3）  
-**Plan:** `docs/apt/plans/2026-07-03-apt-2.0.6-page-factory-plan.md`
+**Plan:** `docs/apt/plans/2026-07-04-java-api-path-rules-plan.md`  
+**Status:** complete  
+**Verify:** `cd arch-engine && npm test -- tests/reindex/apis.test.ts` — PASS (2 tests)
 
-## 交付物
+## Delivered
 
-| 文件 | 变更 |
-|------|------|
-| `templates/page-rollout-spec.md` | **新建** — Phase A 完成声明、页面清单、feature 域、跨页约束、logic 引用、B1/B2/B3 说明 |
-| `templates/plan-from-spec.md` | **增补** §0 Phase A 门禁（`check-v0-freeze`）；Part 2 B1/B2/B3 单页 Task 示例 |
-| `templates/feature.md` | **增补** §0 页面工厂与批量门禁、logic SSOT、禁止无 plan 批量 UI |
+| File | Change |
+|------|--------|
+| `arch-engine/src/reindex/apis.ts` | **NEW** — `runReindexApis`, `ReindexApisReport`, `ReindexApisDeps` |
+| `arch-engine/src/writer/markdown.ts` | Export `renderApiMd`, add `writeApiDocsForModel` |
+| `arch-engine/src/writer/arch-index.ts` | Add `patchArchIndexApiNodes` |
+| `arch-engine/src/vector/sqlite-store.ts` | Add `deleteChunksByKindAndPathPrefix` |
+| `arch-engine/src/pipeline.ts` | Re-export `runReindexApis` types |
+| `arch-engine/src/index.ts` | Re-export `runReindexApis` types |
+| `arch-engine/tests/reindex/apis.test.ts` | **NEW** — java-module fixture + manual `/admin-api` → reindex → `api.md` |
 
-## 验证
+## Behavior
 
-```text
-node scripts/inject-platform-assets.cjs tmp-inject-test .
-```
+`runReindexApis(projectRoot, deps?)`:
 
-- inject OK；`.claude`/`.qoder`/`.zcode` commands 与 `.agents`/`.zcode` skills 均含 `check-v0-freeze`、`B1/B2/B3`、`logic SSOT` 新段落
-- 临时目录已删除
+1. `loadOrInitConfig` + `resolveApiKey` (embedding)
+2. `resolveJavaPathRules` + `writePathRulesSnapshot`
+3. Maven scan → `scanJavaSources` → `scanOpenApiGlobs` → `mergeDocumentModel`
+4. `writeApiDocsForModel` per backend module with APIs
+5. `loadArchIndex` → `patchArchIndexApiNodes` → `writeArchIndex` + `writeIndexMd`
+6. VectorStore: `deleteChunksByKindAndPathPrefix('api', 'backend/<slug>/api')` per module; embed + upsert API chunks; patch index chunk refs
+7. If `.ai/arch/entities.json` exists → `deriveFlowGraph` → `writeFlowDocs`
+8. Update `last-scan.json` `pathRulesHash` (preserve other fields)
 
-## 与 Spec §5 对照
+Returns `{ apiCount, modulesUpdated }`.
 
-- [x] rollup spec 骨架（§5.1）→ `page-rollout-spec.md`
-- [x] plan-from-spec Phase A 门禁（§4.5 / §5.2）→ §0
-- [x] 单页 B1/B2/B3 Task 模板（§5.3）→ Part 2 示例
-- [x] feature 与 `/feature` 关系（§5.4）→ §0 批量门禁 + logic SSOT
+## Notes
 
-## 未改动
-
-- MCP 工具、inject `EXTRA_SKILLS`、AGENTS.md（非本 Task 白名单）
+- Avoided circular import with `pipeline.ts` by inlining `computePathRulesHash` in `apis.ts` (same algorithm as `pipeline.ts`).
+- Integration test uses dynamic module slug from `findMavenModules` (fixture copied to temp root, not `java-module` subfolder).

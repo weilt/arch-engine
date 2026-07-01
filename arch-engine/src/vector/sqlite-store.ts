@@ -326,6 +326,28 @@ export class VectorStore {
     }
   }
 
+  /** Delete chunks matching kind and path prefix (exact path or path/subpath). */
+  deleteChunksByKindAndPathPrefix(
+    kind: ArchChunk["kind"],
+    pathPrefix: string
+  ): void {
+    const pathLike = `${pathPrefix}%`;
+    const ids = this.db
+      .prepare("SELECT id FROM chunks WHERE kind = ? AND path LIKE ?")
+      .all(kind, pathLike) as { id: string }[];
+    if (ids.length === 0) return;
+
+    this.db
+      .prepare("DELETE FROM chunks WHERE kind = ? AND path LIKE ?")
+      .run(kind, pathLike);
+    if (this.vecTableExists()) {
+      const placeholders = ids.map(() => "?").join(", ");
+      this.db
+        .prepare(`DELETE FROM ${VEC_TABLE} WHERE chunk_id IN (${placeholders})`)
+        .run(...ids.map((r) => r.id));
+    }
+  }
+
   listSourcePaths(): string[] {
     const rows = this.db
       .prepare(

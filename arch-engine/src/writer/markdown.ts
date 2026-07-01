@@ -11,7 +11,7 @@ Module path: \`${modulePath}\`
 `;
 }
 
-function renderApiMd(apis: ApiEndpoint[]): string {
+export function renderApiMd(apis: ApiEndpoint[]): string {
   const lines = ["# API", ""];
   for (const api of apis) {
     lines.push(`## ${api.method} ${api.path}`);
@@ -244,6 +244,27 @@ function renderStoresMd(pkg: FrontendPackage): string {
 async function writeFileEnsuringDir(filePath: string, content: string): Promise<void> {
   await fs.mkdir(path.dirname(filePath), { recursive: true });
   await fs.writeFile(filePath, content, "utf-8");
+}
+
+/** Write `backend/<slug>/api.md` for each module that has HTTP endpoints. */
+export async function writeApiDocsForModel(
+  projectRoot: string,
+  model: DocumentModel
+): Promise<number> {
+  const archDir = getArchDir(projectRoot);
+  let modulesUpdated = 0;
+
+  for (const mod of model.modules) {
+    const moduleApis = model.apis.filter((a) => a.moduleSlug === mod.slug);
+    if (moduleApis.length === 0) continue;
+    await writeFileEnsuringDir(
+      path.join(archDir, "backend", mod.slug, "api.md"),
+      renderApiMd(moduleApis)
+    );
+    modulesUpdated++;
+  }
+
+  return modulesUpdated;
 }
 
 export async function writeMarkdownTree(

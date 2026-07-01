@@ -299,6 +299,32 @@ export async function writeIndexMd(projectRoot: string, index: ArchIndex): Promi
   await fs.writeFile(getArchIndexMdPath(projectRoot), renderIndexMd(index), "utf-8");
 }
 
+/** Update API doc nodes (anchors, keywords, summary, optional chunk ids) from scan model. */
+export function patchArchIndexApiNodes(
+  index: ArchIndex,
+  model: DocumentModel,
+  apiChunks?: ArchChunk[]
+): void {
+  for (const mod of model.modules) {
+    const apiPath = `backend/${mod.slug}/api`;
+    const node = index.nodes[apiPath];
+    if (!node) continue;
+
+    const moduleApis = model.apis.filter((a) => a.moduleSlug === mod.slug);
+    node.anchors = moduleApis.map((a) => a.id);
+    node.keywords = [
+      mod.slug,
+      ...moduleApis.map((a) => a.path),
+      ...moduleApis.flatMap((a) => a.tags),
+    ];
+    node.summary = `${moduleApis.length} HTTP endpoint(s)`;
+
+    if (apiChunks) {
+      node.chunks = apiChunks.filter((c) => c.path === apiPath).map((c) => c.id);
+    }
+  }
+}
+
 export async function attachChunksToIndex(
   projectRoot: string,
   chunks: ArchChunk[]

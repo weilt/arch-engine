@@ -114,6 +114,12 @@ export {
 } from "./pipeline.js";
 
 export {
+  runReindexApis,
+  type ReindexApisReport,
+  type ReindexApisDeps,
+} from "./reindex/apis.js";
+
+export {
   auditArchChanges,
   MissingLastScanError,
   type AuditArchChangesResult,

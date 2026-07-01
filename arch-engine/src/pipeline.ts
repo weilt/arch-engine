@@ -842,3 +842,9 @@ export async function runStartInit(
     moduleCount: model.modules.length,
   };
 }
+
+export {
+  runReindexApis,
+  type ReindexApisReport,
+  type ReindexApisDeps,
+} from "./reindex/apis.js";
