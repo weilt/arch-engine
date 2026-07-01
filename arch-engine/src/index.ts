@@ -120,6 +120,15 @@ export {
 } from "./reindex/apis.js";
 
 export {
+  updateJavaPathRules,
+  type UpdateJavaPathRulesInput,
+  type UpdateJavaPathRulesResult,
+  type UpdateJavaPathRulesReindexResult,
+  type UpdateJavaPathRulesSamplePath,
+  type UpdateJavaPathRulesDeps,
+} from "./path-rules/update.js";
+
+export {
   auditArchChanges,
   MissingLastScanError,
   type AuditArchChangesResult,
