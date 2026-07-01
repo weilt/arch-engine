@@ -2,12 +2,15 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import type { ArchConfig } from "../../src/types.js";
 import {
   antPackageMatch,
   applyPathRulesToEndpointPath,
+  mergePathRules,
   prefixForControllerPackage,
   resolveJavaPathRules,
 } from "../../src/scanners/java-path-rules.js";
+import { writePathRulesSnapshot } from "../../src/writer/path-rules.js";
 
 const WEB_PROPERTIES = `
 @ConfigurationProperties(prefix = "base.web")
@@ -85,5 +88,86 @@ describe("java-path-rules", () => {
     expect(
       applyPathRulesToEndpointPath(rules, pkg, "/system/oauth2/user")
     ).toBe("/admin-api/system/oauth2/user");
+  });
+
+  it("manual overrides auto on same controllerPattern", async () => {
+    const config = {
+      java: {
+        controllerPathPrefixes: [
+          {
+            prefix: "/custom-admin-api",
+            controllerPattern: "**.controller.admin.**",
+          },
+        ],
+      },
+    } as ArchConfig;
+
+    const rules = await resolveJavaPathRules(tmpRoot, config);
+    const adminRule = rules.controllerPrefixes.find(
+      (r) => r.controllerPattern === "**.controller.admin.**"
+    );
+    expect(adminRule?.prefix).toBe("/custom-admin-api");
+    expect(adminRule?.source).toBe("manual");
+    expect(adminRule?.overrides).toMatch(/field:adminApi/);
+    expect(rules.controllerPrefixes).toHaveLength(3);
+    expect(rules.confidence).toBe("high");
+    expect(rules.sources).toContain("manual");
+  });
+
+  it("manual-only rules yield confidence medium", async () => {
+    const emptyRoot = await fs.mkdtemp(path.join(os.tmpdir(), "path-rules-manual-"));
+    try {
+      const config = {
+        java: {
+          controllerPathPrefixes: [
+            {
+              prefix: "/api",
+              controllerPattern: "**.controller.**",
+            },
+          ],
+        },
+      } as ArchConfig;
+
+      const rules = await resolveJavaPathRules(emptyRoot, config);
+      expect(rules.confidence).toBe("medium");
+      expect(rules.controllerPrefixes).toHaveLength(1);
+      expect(rules.controllerPrefixes[0]?.source).toBe("manual");
+      expect(rules.controllerPrefixes[0]?.overrides).toBeNull();
+      expect(rules.sources).toContain("manual");
+    } finally {
+      await fs.rm(emptyRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("mergePathRules preserves non-overridden auto rules", async () => {
+    const auto = await resolveJavaPathRules(tmpRoot);
+    const merged = mergePathRules(auto, [
+      {
+        prefix: "/custom-admin-api",
+        controllerPattern: "**.controller.admin.**",
+      },
+    ]);
+    expect(merged.controllerPrefixes.map((r) => r.prefix).sort()).toEqual([
+      "/app-api",
+      "/custom-admin-api",
+      "/pc-api",
+    ]);
+  });
+
+  it("writePathRulesSnapshot writes path-rules.json", async () => {
+    const rules = await resolveJavaPathRules(tmpRoot);
+    await writePathRulesSnapshot(tmpRoot, rules);
+
+    const snapshotPath = path.join(tmpRoot, ".ai", "arch", "path-rules.json");
+    const raw = await fs.readFile(snapshotPath, "utf-8");
+    const snapshot = JSON.parse(raw) as {
+      confidence: string;
+      rules: { source: string; file?: string; overrides?: string | null }[];
+    };
+    expect(snapshot.confidence).toBe("high");
+    expect(snapshot.rules).toHaveLength(3);
+    const appRule = snapshot.rules.find((r) => r.source.includes("appApi"));
+    expect(appRule?.file).toMatch(/WebProperties\.java$/);
+    expect(appRule?.overrides).toBeNull();
   });
 });

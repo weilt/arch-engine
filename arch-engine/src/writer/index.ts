@@ -17,3 +17,4 @@ export {
 } from "./arch-index.js";
 export { writeEntityDocs } from "./entity-md.js";
 export { writeFlowDocs } from "./flow-md.js";
+export { writePathRulesSnapshot } from "./path-rules.js";

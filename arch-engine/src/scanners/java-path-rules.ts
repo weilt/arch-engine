@@ -2,6 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import fg from "fast-glob";
 import YAML from "yaml";
+import type { ArchConfig, ControllerPathPrefixConfig } from "../types.js";
 
 /** One controller-package → URL prefix rule (Spring PathMatch / WebMvcRegistrations). */
 export interface ControllerPathPrefixRule {
@@ -9,6 +10,10 @@ export interface ControllerPathPrefixRule {
   /** Ant-style pattern with `.` as separator, e.g. `**.controller.admin.**` */
   controllerPattern: string;
   source: string;
+  /** When manual overrides auto, records the overridden auto rule source. */
+  overrides?: string | null;
+  /** Relative path to the Java file that produced an auto-discovered rule. */
+  file?: string;
 }
 
 export interface ResolvedJavaPathRules {
@@ -303,10 +308,60 @@ function rulesFromInlineWebMvc(content: string, file: string): ControllerPathPre
   return rules;
 }
 
+function normalizeControllerPattern(pattern: string): string {
+  return pattern.trim();
+}
+
 /**
- * Discover WebMvcRegistrations (and related config), resolve URL prefix rules for controllers.
+ * Merge auto-discovered rules with manual config entries.
+ * Manual rules override auto on the same normalized `controllerPattern`.
  */
-export async function resolveJavaPathRules(
+export function mergePathRules(
+  auto: ResolvedJavaPathRules,
+  manual: ControllerPathPrefixConfig[]
+): ResolvedJavaPathRules {
+  const byPattern = new Map<string, ControllerPathPrefixRule>();
+
+  for (const rule of auto.controllerPrefixes) {
+    byPattern.set(normalizeControllerPattern(rule.controllerPattern), rule);
+  }
+
+  for (const entry of manual) {
+    const key = normalizeControllerPattern(entry.controllerPattern);
+    const existing = byPattern.get(key);
+    byPattern.set(key, {
+      prefix: entry.prefix,
+      controllerPattern: key,
+      source: entry.source ?? "manual",
+      overrides: existing?.source ?? null,
+    });
+  }
+
+  const hasManual = manual.length > 0;
+  const hasAuto = auto.controllerPrefixes.length > 0;
+  let confidence = auto.confidence;
+
+  if (hasManual && !hasAuto) {
+    confidence = "medium";
+  } else if (hasManual && hasAuto) {
+    confidence = auto.confidence === "high" ? "high" : "medium";
+  }
+
+  const sources = [...auto.sources];
+  if (hasManual) sources.push("manual");
+
+  return {
+    contextPath: auto.contextPath,
+    controllerPrefixes: [...byPattern.values()],
+    confidence,
+    sources,
+  };
+}
+
+/**
+ * Auto-discover path rules from project source (WebMvcRegistrations chain, yml, etc.).
+ */
+export async function discoverAutoPathRulesFromRoot(
   projectRoot: string
 ): Promise<ResolvedJavaPathRules> {
   const sources: string[] = [];
@@ -370,6 +425,18 @@ export async function resolveJavaPathRules(
     confidence,
     sources,
   };
+}
+
+/**
+ * Discover and merge auto + manual path rules for controller URL prefixes.
+ */
+export async function resolveJavaPathRules(
+  projectRoot: string,
+  config?: ArchConfig
+): Promise<ResolvedJavaPathRules> {
+  const auto = await discoverAutoPathRulesFromRoot(projectRoot);
+  const manual = config?.java?.controllerPathPrefixes ?? [];
+  return mergePathRules(auto, manual);
 }
 
 export function extractJavaPackage(content: string): string | undefined {
