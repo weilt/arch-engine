@@ -235,6 +235,22 @@ export function classifyAffectedTargets(
       targets.refs = true;
       targets.pages = true;
     }
+
+    if (base === "page.manifest.json" || within.endsWith("/page.manifest.json")) {
+      targets.pages = true;
+      targets.refs = true;
+    }
+    if (base === "page.logic.md" || within.endsWith("/page.logic.md")) {
+      targets.pages = true;
+    }
+    if (base === "page.tsx" || within.endsWith("/page.tsx")) {
+      targets.pages = true;
+      targets.refs = true;
+    }
+    if (base === "preview.html" || within.endsWith("/preview.html")) {
+      targets.refs = true;
+      targets.pages = true;
+    }
   }
 
   return targets;

@@ -28,6 +28,10 @@ export function getDesignRefsDir(projectRoot: string): string {
   return path.join(getDesignDir(projectRoot), "refs");
 }
 
+export function getDesignLogicDir(projectRoot: string): string {
+  return path.join(getDesignDir(projectRoot), "logic");
+}
+
 export function getDesignGapsPath(projectRoot: string): string {
   return path.join(getDesignDir(projectRoot), "gaps.json");
 }

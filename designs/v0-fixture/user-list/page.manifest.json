@@ -1,0 +1,11 @@
+{
+  "id": "user-list",
+  "pageType": "list",
+  "feature": "user-management",
+  "title": "用户列表",
+  "route": "/users",
+  "description": "管理系统用户，支持搜索、分页与批量操作",
+  "status": "approved",
+  "reviewedBy": "pm@example.com",
+  "reviewedAt": "2026-07-02T00:00:00.000Z"
+}

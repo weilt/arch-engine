@@ -82,17 +82,57 @@ export interface DesignComponentCard {
   sourcePath?: string;
 }
 
+export const V0_PAGE_TYPES = [
+  "list",
+  "form",
+  "detail",
+  "dashboard",
+  "auth",
+  "settings",
+  "wizard",
+  "custom",
+] as const;
+
+export type V0PageType = (typeof V0_PAGE_TYPES)[number];
+
+export interface V0PageApproval {
+  status: string;
+  reviewedBy?: string;
+  reviewedAt?: string;
+}
+
+export interface V0PageManifest {
+  id: string;
+  pageType: V0PageType;
+  feature: string;
+  title: string;
+  route: string;
+  description: string;
+  v0Url?: string;
+  status?: string;
+  reviewedBy?: string;
+  reviewedAt?: string;
+}
+
 export interface DesignPageRecipe {
   id: string;
   title: string;
   regions: { id: string; components: string[] }[];
   states?: Record<string, string>;
   refPaths?: string[];
+  pageType?: string;
+  feature?: string;
+  route?: string;
+  description?: string;
+  logicPath?: string;
+  manifestPath?: string;
+  v0Url?: string;
+  approval?: V0PageApproval;
 }
 
 export interface DesignSyncOptions {
   source?: string;
-  adapter?: "baoyu" | "html" | "figma";
+  adapter?: "baoyu" | "html" | "figma" | "v0";
   dryRun?: boolean;
   pagesOnly?: boolean;
   incremental?: boolean;
@@ -150,6 +190,7 @@ export interface QueryDesignPageResult {
   kind: "page";
   page: DesignPageRecipe;
   gaps: string[];
+  logicMarkdown?: string;
   stale: boolean;
 }
 

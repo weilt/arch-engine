@@ -149,6 +149,7 @@ export {
   getFrameworkBindingsPath,
   getDesignImplementationsDir,
   getArchAlignmentPath,
+  getDesignLogicDir,
 } from "./design/paths.js";
 
 export {
@@ -249,6 +250,8 @@ export type {
   DesignProfile,
   DesignComponentCard,
   DesignPageRecipe,
+  V0PageManifest,
+  V0PageType,
   QueryDesignOptions,
   QueryDesignResult,
   SearchUiOptions,

@@ -7,9 +7,11 @@ import {
 } from "./ingest/baoyu.js";
 import { ingestFigmaSource } from "./ingest/figma.js";
 import { ingestHtmlSource } from "./ingest/html.js";
+import { discoverV0PageSourceDirs, ingestV0Source } from "./ingest/v0.js";
 import {
   getDesignComponentsDir,
   getDesignDir,
+  getDesignLogicDir,
   getDesignPagesDir,
   getDesignRefsDir,
   getDesignStylePath,
@@ -198,6 +200,119 @@ async function runFigmaDesignSync(
   };
 }
 
+async function runV0DesignSync(
+  projectRoot: string,
+  options: DesignSyncOptions
+): Promise<DesignSyncReport> {
+  const dryRun = options.dryRun ?? false;
+  const sourceRel = options.source ?? "designs/v0";
+  const pageDirs = await discoverV0PageSourceDirs(projectRoot, sourceRel);
+  const syncedAt = new Date().toISOString();
+  const existingProfile = await readExistingProfile(projectRoot);
+
+  let pageCount = existingProfile?.pageCount ?? 0;
+  const existingPageIds = new Set<string>();
+  if (existingProfile) {
+    try {
+      const entries = await fs.readdir(getDesignPagesDir(projectRoot));
+      for (const e of entries) {
+        if (e.endsWith(".json")) existingPageIds.add(e.replace(/\.json$/, ""));
+      }
+    } catch {
+      // no pages dir yet
+    }
+    pageCount = existingPageIds.size;
+  }
+
+  const allWarnings: string[] = [...(existingProfile?.warnings ?? [])];
+  let pagesWritten = 0;
+  let maxSourceMtime = existingProfile?.sourceMtimeMs ?? 0;
+  const mergedSources = [...(existingProfile?.sources ?? [])];
+  let primarySource = existingProfile?.primarySource ?? {
+    tool: "v0",
+    path: sourceRel,
+  };
+
+  for (const pageDirRel of pageDirs) {
+    const ingested = await ingestV0Source(projectRoot, pageDirRel);
+    allWarnings.push(...ingested.warnings);
+
+    const pagePath = path.join(getDesignPagesDir(projectRoot), `${ingested.page.id}.json`);
+    const pageExisted = existingPageIds.has(ingested.page.id);
+
+    assertDesignId(ingested.page.id, "page");
+    await writeJson(pagePath, ingested.page, dryRun);
+
+    if (!dryRun) {
+      const logicDir = getDesignLogicDir(projectRoot);
+      await fs.mkdir(logicDir, { recursive: true });
+      await fs.copyFile(
+        ingested.logicAbsPath,
+        path.join(logicDir, `${ingested.page.id}.md`),
+      );
+    }
+
+    const refsDir = getDesignRefsDir(projectRoot);
+    for (const ref of ingested.refFiles) {
+      await copyRef(ref.absPath, refsDir, ref.name, dryRun);
+    }
+
+    if (!pageExisted) {
+      pageCount += 1;
+      existingPageIds.add(ingested.page.id);
+    }
+    pagesWritten += 1;
+    maxSourceMtime = Math.max(maxSourceMtime, ingested.sourceMtimeMs);
+
+    const sourceEntry = { tool: "v0", path: pageDirRel, role: "page" };
+    if (!mergedSources.some((s) => s.tool === "v0" && s.path === pageDirRel)) {
+      mergedSources.push(sourceEntry);
+    }
+    primarySource = { tool: "v0", path: sourceRel };
+  }
+
+  const profile: DesignProfile = existingProfile
+    ? {
+        ...existingProfile,
+        primarySource,
+        sources: mergedSources,
+        syncedAt,
+        pageCount,
+        warnings: [...new Set(allWarnings)],
+        sourceMtimeMs: maxSourceMtime,
+      }
+    : {
+        version: 1,
+        primarySource,
+        sources: mergedSources,
+        syncedAt,
+        componentCount: 0,
+        pageCount,
+        warnings: [...new Set(allWarnings)],
+        sourceMtimeMs: maxSourceMtime,
+      };
+
+  if (!dryRun) {
+    await fs.mkdir(getDesignDir(projectRoot), { recursive: true });
+    await writeJson(getDesignProfilePath(projectRoot), profile, false);
+
+    const indexResult = await indexDesignKnowledge(projectRoot);
+    if (indexResult.warning) {
+      profile.warnings.push(indexResult.warning);
+      await writeJson(getDesignProfilePath(projectRoot), profile, false);
+    }
+  }
+
+  return {
+    profile,
+    componentsWritten: 0,
+    pagesWritten,
+    tokenFiles: [],
+    warnings: profile.warnings,
+    dryRun,
+  };
+}
+
 export async function runDesignSync(
   projectRoot: string,
   options: DesignSyncOptions = {}
@@ -208,6 +323,10 @@ export async function runDesignSync(
 
   if (options.adapter === "figma") {
     return runFigmaDesignSync(projectRoot, options);
+  }
+
+  if (options.adapter === "v0") {
+    return runV0DesignSync(projectRoot, options);
   }
 
   if (options.incremental) {

@@ -316,7 +316,7 @@ server.tool(
 
 server.tool(
   "query_design",
-  "Query project design profile: global tokens/style/bindings, page recipe, or semantic component (component includes binding when framework-bindings.json exists)",
+  "Query project design profile: global tokens/style/bindings, page recipe (includes logicMarkdown, pageType, feature, gaps), or semantic component (component includes binding when framework-bindings.json exists)",
   {
     scope: z.literal("global").optional().describe('Use "global" for tokens and style.md'),
     page: z.string().optional().describe("Page recipe slug, e.g. user-settings"),

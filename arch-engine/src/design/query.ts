@@ -4,6 +4,7 @@ import {
   getDesignComponentsDir,
   getDesignDir,
   getDesignGapsPath,
+  getDesignLogicDir,
   getDesignPagesDir,
   getDesignProfilePath,
   getDesignRefsDir,
@@ -114,7 +115,42 @@ export async function queryDesign(
     for (const cid of Object.values(page.states ?? {})) {
       if (cid && !componentIds.has(cid)) gaps.push(cid);
     }
-    return { kind: "page", page, stale, gaps: [...new Set(gaps)] };
+
+    if (page.manifestPath) {
+      if (page.approval?.status !== "approved") {
+        gaps.push("manifest-not-approved");
+      }
+
+      const hasTsxRef = (page.refPaths ?? []).some((p) => p.endsWith(".tsx"));
+      if (!hasTsxRef) {
+        gaps.push("no-implementation-ref");
+      }
+    }
+
+    let logicMarkdown: string | undefined;
+    if (page.logicPath) {
+      const logicAbs = path.join(getDesignDir(projectRoot), page.logicPath);
+      try {
+        const raw = await fs.readFile(logicAbs, "utf-8");
+        const maxLen = 8000;
+        logicMarkdown =
+          raw.length > maxLen ? `${raw.slice(0, maxLen)}\n\n…(truncated)` : raw;
+      } catch {
+        if (page.manifestPath) {
+          gaps.push("missing-logic");
+        }
+      }
+    } else if (page.manifestPath) {
+      gaps.push("missing-logic");
+    }
+
+    return {
+      kind: "page",
+      page,
+      stale,
+      gaps: [...new Set(gaps)],
+      logicMarkdown,
+    };
   }
 
   const style = await fs.readFile(getDesignStylePath(projectRoot), "utf-8").catch(() => "");
@@ -166,11 +202,19 @@ export async function searchUi(
   if (kindFilter !== "component") {
     const pageDir = getDesignPagesDir(projectRoot);
     for (const id of await listJsonIds(pageDir)) {
-      const page = await readJsonFile<{ id: string; title: string }>(
+      const page = await readJsonFile<DesignPageRecipe>(
         path.join(pageDir, `${id}.json`)
       );
       if (!page) continue;
-      const score = scoreText(options.query, `${page.id} ${page.title}`);
+      const blob = [
+        page.id,
+        page.title,
+        page.pageType ?? "",
+        page.feature ?? "",
+        page.description ?? "",
+        page.route ?? "",
+      ].join(" ");
+      const score = scoreText(options.query, blob);
       if (score > 0) {
         hits.push({
           kind: "page",

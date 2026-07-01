@@ -6,6 +6,7 @@ import type { ArchChunk, ArchConfig } from "../types.js";
 import { VectorStore, type SearchHit } from "../vector/sqlite-store.js";
 import {
   getDesignComponentsDir,
+  getDesignDir,
   getDesignPagesDir,
   getDesignStylePath,
   getDesignVectorsDbPath,
@@ -76,6 +77,10 @@ function componentToText(card: DesignComponentCard): string {
 
 function pageToText(page: DesignPageRecipe): string {
   const lines = [`[design-page] ${page.id}`, `Title: ${page.title}`];
+  if (page.pageType) lines.push(`PageType: ${page.pageType}`);
+  if (page.feature) lines.push(`Feature: ${page.feature}`);
+  if (page.description) lines.push(`Description: ${page.description}`);
+  if (page.route) lines.push(`Route: ${page.route}`);
   for (const region of page.regions ?? []) {
     lines.push(`Region ${region.id}: ${(region.components ?? []).join(", ")}`);
   }
@@ -85,6 +90,19 @@ function pageToText(page: DesignPageRecipe): string {
     }
   }
   return lines.join("\n");
+}
+
+async function readLogicExcerpt(projectRoot: string, page: DesignPageRecipe): Promise<string> {
+  if (!page.logicPath) return "";
+  try {
+    const raw = await fs.readFile(
+      path.join(getDesignDir(projectRoot), page.logicPath),
+      "utf-8"
+    );
+    return raw.trim().slice(0, 400);
+  } catch {
+    return "";
+  }
 }
 
 export function chunkStyleMarkdown(text: string): string[] {
@@ -142,6 +160,10 @@ export async function collectDesignChunks(projectRoot: string): Promise<DesignCh
     const page = await readJsonFile<DesignPageRecipe>(path.join(pageDir, `${id}.json`));
     if (!page) continue;
     const rel = `pages/${id}.json`;
+    const logicExcerpt = await readLogicExcerpt(projectRoot, page);
+    const text = logicExcerpt
+      ? `${pageToText(page)}\nLogic: ${logicExcerpt}`
+      : pageToText(page);
     specs.push({
       meta: {
         id: `design/pages/${id}`,
@@ -150,7 +172,7 @@ export async function collectDesignChunks(projectRoot: string): Promise<DesignCh
         title: page.title,
         text: "",
       },
-      text: pageToText(page),
+      text,
       sourcePath: rel,
     });
   }
