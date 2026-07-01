@@ -103,4 +103,75 @@ describe("arch config", () => {
   it("DEFAULT_CONFIG exposes projectMeta as null", () => {
     expect(DEFAULT_CONFIG.projectMeta).toBeNull();
   });
+
+  it("loadOrInitConfig accepts config without java section", async () => {
+    tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "arch-config-"));
+    const archDir = path.join(tmpDir, ".ai", "arch");
+    await fs.mkdir(archDir, { recursive: true });
+    await fs.writeFile(
+      path.join(archDir, "arch.config.json"),
+      JSON.stringify(DEFAULT_CONFIG, null, 2),
+      "utf-8"
+    );
+
+    const { config, created } = await loadOrInitConfig(tmpDir);
+    expect(created).toBe(false);
+    expect(config.java).toBeUndefined();
+  });
+
+  it("loadOrInitConfig accepts valid java.controllerPathPrefixes", async () => {
+    tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "arch-config-"));
+    const archDir = path.join(tmpDir, ".ai", "arch");
+    await fs.mkdir(archDir, { recursive: true });
+    const configWithJava = {
+      ...DEFAULT_CONFIG,
+      java: {
+        extraSourceRoots: ["../framework"],
+        controllerPathPrefixes: [
+          {
+            prefix: "/admin-api",
+            controllerPattern: "**.controller.admin.**",
+            source: "manual",
+            note: "admin controllers",
+          },
+        ],
+      },
+    };
+    await fs.writeFile(
+      path.join(archDir, "arch.config.json"),
+      JSON.stringify(configWithJava, null, 2),
+      "utf-8"
+    );
+
+    const { config, created } = await loadOrInitConfig(tmpDir);
+    expect(created).toBe(false);
+    expect(config.java?.controllerPathPrefixes?.[0]?.prefix).toBe("/admin-api");
+    expect(config.java?.extraSourceRoots).toEqual(["../framework"]);
+  });
+
+  it("loadOrInitConfig rejects java.controllerPathPrefixes prefix without leading slash", async () => {
+    tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "arch-config-"));
+    const archDir = path.join(tmpDir, ".ai", "arch");
+    await fs.mkdir(archDir, { recursive: true });
+    const invalidConfig = {
+      ...DEFAULT_CONFIG,
+      java: {
+        controllerPathPrefixes: [
+          {
+            prefix: "admin-api",
+            controllerPattern: "**.controller.admin.**",
+          },
+        ],
+      },
+    };
+    await fs.writeFile(
+      path.join(archDir, "arch.config.json"),
+      JSON.stringify(invalidConfig, null, 2),
+      "utf-8"
+    );
+
+    await expect(loadOrInitConfig(tmpDir)).rejects.toThrow(
+      'java.controllerPathPrefixes[].prefix must start with "/"'
+    );
+  });
 });

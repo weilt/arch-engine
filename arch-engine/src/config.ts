@@ -56,6 +56,34 @@ async function loadSecretsOverlay(projectRoot: string): Promise<ArchSecretsParti
   }
 }
 
+function assertValidJavaSection(java: unknown): void {
+  if (java === undefined || java === null) return;
+  if (typeof java !== "object" || Array.isArray(java)) {
+    throw new Error("Invalid arch.config.json: java must be an object");
+  }
+  const j = java as Record<string, unknown>;
+  const prefixes = j.controllerPathPrefixes;
+  if (prefixes === undefined) return;
+  if (!Array.isArray(prefixes)) {
+    throw new Error(
+      "Invalid arch.config.json: java.controllerPathPrefixes must be an array"
+    );
+  }
+  for (const entry of prefixes) {
+    if (typeof entry !== "object" || entry === null || Array.isArray(entry)) {
+      throw new Error(
+        "Invalid arch.config.json: java.controllerPathPrefixes entries must be objects"
+      );
+    }
+    const prefix = (entry as Record<string, unknown>).prefix;
+    if (typeof prefix === "string" && prefix.length > 0 && !prefix.startsWith("/")) {
+      throw new Error(
+        `Invalid arch.config.json: java.controllerPathPrefixes[].prefix must start with "/" (got: ${prefix})`
+      );
+    }
+  }
+}
+
 function assertValidConfig(data: unknown): ArchConfig {
   const c = data as Record<string, unknown>;
   const e = c.embedding as Record<string, unknown> | undefined;
@@ -66,6 +94,7 @@ function assertValidConfig(data: unknown): ArchConfig {
         "(embedding.baseUrl, embedding.model, chunking.baseUrl, chunking.chatModel)"
     );
   }
+  assertValidJavaSection(c.java);
   return data as ArchConfig;
 }
 

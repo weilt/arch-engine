@@ -278,6 +278,44 @@ export interface LastScanModuleEntry {
   fileHashes: Record<string, string>;
 }
 
+/** Manual controller path prefix declared in arch.config.json `java.controllerPathPrefixes`. */
+export interface ControllerPathPrefixConfig {
+  prefix: string;
+  /** Ant-style pattern with `.` as separator, e.g. `**.controller.admin.**` */
+  controllerPattern: string;
+  /** Typically `manual` when set in config; omitted when written by MCP upsert. */
+  source?: string;
+  note?: string;
+}
+
+/** Optional Java scanner settings in arch.config.json. */
+export interface JavaScanConfig {
+  /** Relative paths from projectRoot for path-rules discovery only (not Maven modules). */
+  extraSourceRoots?: string[];
+  controllerPathPrefixes?: ControllerPathPrefixConfig[];
+}
+
+/** One resolved rule entry in `.ai/arch/path-rules.json`. */
+export interface PathRulesSnapshotRule {
+  prefix: string;
+  controllerPattern: string;
+  source: string;
+  /** When manual overrides auto, records the overridden auto rule source. */
+  overrides?: string | null;
+  /** Relative path to the Java file that produced an auto-discovered rule. */
+  file?: string;
+}
+
+/** Resolved path-rules snapshot written to `.ai/arch/path-rules.json`. */
+export interface PathRulesSnapshot {
+  resolvedAt: string;
+  contextPath: string;
+  confidence: "high" | "medium" | "low";
+  rules: PathRulesSnapshotRule[];
+  sources: string[];
+  warnings: string[];
+}
+
 export interface LastScanState {
   version: 2;
   commit: string;
@@ -285,6 +323,8 @@ export interface LastScanState {
   scannedAt: string;
   modules: Record<string, LastScanModuleEntry>;
   packages: Record<string, LastScanModuleEntry>;
+  /** Stable hash of path-rules.json content for incremental reindex detection. */
+  pathRulesHash?: string;
 }
 
 export interface ArchConfig {
@@ -330,5 +370,7 @@ export interface ArchConfig {
   frontendPackages?: string[];
   /** Optional manually-declared project metadata for ontology snapshot (v2.0.2). */
   projectMeta?: { name?: string; techStack?: string[] } | null;
- scanners: { java: boolean; frontend: boolean };
+  /** Optional Java scanner settings (path-rules discovery, manual prefixes). */
+  java?: JavaScanConfig;
+  scanners: { java: boolean; frontend: boolean };
 }
