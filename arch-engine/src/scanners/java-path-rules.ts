@@ -118,10 +118,7 @@ function fieldNameFromGetter(getter: string): string {
   return name;
 }
 
-function findReferencedPropertiesClass(
-  webMvcFileContent: string,
-  projectRoot: string
-): string | null {
+function findReferencedPropertiesClass(webMvcFileContent: string): string | null {
   const enableMatch = webMvcFileContent.match(
     /@EnableConfigurationProperties\s*\(\s*(\w+)\.class\s*\)/
   );
@@ -138,15 +135,57 @@ function findReferencedPropertiesClass(
 }
 
 async function findJavaFileByClassName(
-  projectRoot: string,
+  roots: string[],
   className: string
 ): Promise<string | null> {
-  const hits = await fg.glob(`**/${className}.java`, {
-    cwd: projectRoot,
-    absolute: true,
-    ignore: ["**/target/**", "**/node_modules/**"],
-  });
-  return hits[0] ?? null;
+  for (const root of roots) {
+    const hits = await fg.glob(`**/${className}.java`, {
+      cwd: root,
+      absolute: true,
+      ignore: ["**/target/**", "**/node_modules/**"],
+    });
+    if (hits[0]) return hits[0];
+  }
+  return null;
+}
+
+async function globJavaFiles(roots: string[]): Promise<string[]> {
+  const files: string[] = [];
+  for (const root of roots) {
+    const hits = await fg.glob("**/*.java", {
+      cwd: root,
+      absolute: true,
+      ignore: ["**/target/**", "**/node_modules/**"],
+    });
+    files.push(...hits);
+  }
+  return files;
+}
+
+function classNameFromJavaFile(file: string): string {
+  return path.basename(file, ".java");
+}
+
+function isWebPropertiesDirectCandidate(content: string): boolean {
+  return CONFIG_PROPERTIES_RE.test(content) && /new\s+Api\s*\(/.test(content);
+}
+
+function mergeRulesByPattern(
+  existing: ControllerPathPrefixRule[],
+  incoming: ControllerPathPrefixRule[]
+): ControllerPathPrefixRule[] {
+  const seen = new Set(
+    existing.map((r) => normalizeControllerPattern(r.controllerPattern))
+  );
+  const merged = [...existing];
+  for (const rule of incoming) {
+    const key = normalizeControllerPattern(rule.controllerPattern);
+    if (!seen.has(key)) {
+      seen.add(key);
+      merged.push(rule);
+    }
+  }
+  return merged;
 }
 
 function parseYmlFlat(root: unknown, prefix: string): Record<string, string> {
@@ -359,23 +398,22 @@ export function mergePathRules(
 }
 
 /**
- * Auto-discover path rules from project source (WebMvcRegistrations chain, yml, etc.).
+ * Auto-discover path rules from project source (WebMvcRegistrations chain,
+ * WebProperties direct, yml, etc.) across one or more source roots.
  */
-export async function discoverAutoPathRulesFromRoot(
-  projectRoot: string
+export async function discoverAutoPathRules(
+  roots: string[]
 ): Promise<ResolvedJavaPathRules> {
+  const projectRoot = roots[0] ?? ".";
   const sources: string[] = [];
   let controllerPrefixes: ControllerPathPrefixRule[] = [];
   let confidence: ResolvedJavaPathRules["confidence"] = "low";
 
-  const webMvcFiles = await fg.glob("**/*.java", {
-    cwd: projectRoot,
-    absolute: true,
-    ignore: ["**/target/**", "**/node_modules/**"],
-  });
+  const javaFiles = await globJavaFiles(roots);
 
+  // Detector A: WebMvcRegistrations → WebProperties chain (or inline prefixes)
   const registrationFiles: string[] = [];
-  for (const file of webMvcFiles) {
+  for (const file of javaFiles) {
     const content = await fs.readFile(file, "utf-8");
     if (WEB_MVC_REGISTRATIONS_RE.test(content)) {
       registrationFiles.push(file);
@@ -386,9 +424,9 @@ export async function discoverAutoPathRulesFromRoot(
     const content = await fs.readFile(file, "utf-8");
     sources.push(file);
 
-    const propsClassName = findReferencedPropertiesClass(content, projectRoot);
+    const propsClassName = findReferencedPropertiesClass(content);
     if (propsClassName) {
-      const propsFile = await findJavaFileByClassName(projectRoot, propsClassName);
+      const propsFile = await findJavaFileByClassName(roots, propsClassName);
       if (propsFile) {
         const propsContent = await fs.readFile(propsFile, "utf-8");
         const cpMatch = propsContent.match(CONFIG_PROPERTIES_RE);
@@ -401,7 +439,7 @@ export async function discoverAutoPathRulesFromRoot(
         }
 
         if (rules.length > 0) {
-          controllerPrefixes = rules;
+          controllerPrefixes = mergeRulesByPattern(controllerPrefixes, rules);
           confidence = "high";
         }
       }
@@ -410,8 +448,33 @@ export async function discoverAutoPathRulesFromRoot(
     if (controllerPrefixes.length === 0) {
       const inline = rulesFromInlineWebMvc(content, file);
       if (inline.length > 0) {
-        controllerPrefixes = inline;
+        controllerPrefixes = mergeRulesByPattern(controllerPrefixes, inline);
         confidence = "medium";
+      }
+    }
+  }
+
+  // Detector B: @ConfigurationProperties + new Api(...) without WebMvcRegistrations chain
+  for (const file of javaFiles) {
+    const content = await fs.readFile(file, "utf-8");
+    if (!isWebPropertiesDirectCandidate(content)) continue;
+
+    const className = classNameFromJavaFile(file);
+    const cpMatch = content.match(CONFIG_PROPERTIES_RE);
+    const configPrefix = cpMatch?.[1];
+
+    let rules = rulesFromPropertiesJava(content, className, file);
+    if (configPrefix) {
+      const ymlFlat = await loadYamlConfigKeys(projectRoot, configPrefix);
+      rules = applyYmlOverridesToRules(rules, ymlFlat, configPrefix);
+    }
+
+    if (rules.length > 0) {
+      const before = controllerPrefixes.length;
+      controllerPrefixes = mergeRulesByPattern(controllerPrefixes, rules);
+      if (controllerPrefixes.length > before) {
+        sources.push(file);
+        if (confidence !== "high") confidence = "high";
       }
     }
   }
@@ -434,7 +497,12 @@ export async function resolveJavaPathRules(
   projectRoot: string,
   config?: ArchConfig
 ): Promise<ResolvedJavaPathRules> {
-  const auto = await discoverAutoPathRulesFromRoot(projectRoot);
+  const roots = [
+    projectRoot,
+    ...(config?.java?.extraSourceRoots?.map((r) => path.resolve(projectRoot, r)) ??
+      []),
+  ];
+  const auto = await discoverAutoPathRules(roots);
   const manual = config?.java?.controllerPathPrefixes ?? [];
   return mergePathRules(auto, manual);
 }

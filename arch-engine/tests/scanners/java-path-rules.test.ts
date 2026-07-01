@@ -81,6 +81,37 @@ describe("java-path-rules", () => {
     ]);
   });
 
+  it("resolveJavaPathRules discovers WebProperties direct without WebMvcRegistrations", async () => {
+    const onlyPropsRoot = await fs.mkdtemp(
+      path.join(os.tmpdir(), "path-rules-props-only-")
+    );
+    try {
+      const pkgDir = path.join(
+        onlyPropsRoot,
+        "src/main/java/cn/example/framework/web/config"
+      );
+      await fs.mkdir(pkgDir, { recursive: true });
+      await fs.writeFile(path.join(pkgDir, "WebProperties.java"), WEB_PROPERTIES);
+      expect(WEB_PROPERTIES).not.toMatch(/WebMvcRegistrations/);
+
+      const rules = await resolveJavaPathRules(onlyPropsRoot);
+      expect(rules.confidence).toBe("high");
+      expect(rules.controllerPrefixes).toHaveLength(3);
+      expect(rules.controllerPrefixes.map((r) => r.prefix).sort()).toEqual([
+        "/admin-api",
+        "/app-api",
+        "/pc-api",
+      ]);
+      expect(
+        rules.controllerPrefixes.every((r) =>
+          r.source.includes("WebProperties.java")
+        )
+      ).toBe(true);
+    } finally {
+      await fs.rm(onlyPropsRoot, { recursive: true, force: true });
+    }
+  });
+
   it("applyPathRulesToEndpointPath adds admin-api prefix for admin controllers", async () => {
     const rules = await resolveJavaPathRules(tmpRoot);
     const pkg = "cn.example.module.controller.admin.auth";

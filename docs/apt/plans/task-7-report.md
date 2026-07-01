@@ -1,40 +1,32 @@
-# Task 7 Report — 回归 + inject 产物提交
+# Task 7 报告：discoverAutoPathRules + WebProperties 直连
 
-**日期**: 2026-07-01  
-**范围**: APT 2.0.6 page-factory inject 输出
+**Plan:** `docs/apt/plans/2026-07-04-java-api-path-rules-plan.md` Task 7  
+**Spec 依据:** §6 扩展自动发现 — 探测器 A/B；§5.1 `resolveJavaPathRules` roots 合并
 
-## 回归结果
+## 完成项
 
-| 套件 | 命令 | 结果 |
-|------|------|------|
-| arch-engine | `npm test` | **PASS** — 63 files, 305 tests |
-| mcp-server | `npm test` | **PASS** — 21 files, 127 tests |
-| scripts | `node --test scripts/inject-platform-assets.test.js scripts/check-v0-freeze.test.js` | **PASS** — 14 tests |
+| 文件 | 变更 |
+|------|------|
+| `arch-engine/src/scanners/java-path-rules.ts` | `discoverAutoPathRulesFromRoot` → `discoverAutoPathRules(roots: string[])`，多 root glob `**/*.java` |
+| 同上 | 探测器 A：`WebMvcRegistrations` → `WebProperties` 链（保留） |
+| 同上 | 探测器 B：`@ConfigurationProperties` + `new Api(` 直连，无需同文件含 `WebMvcRegistrations` |
+| 同上 | `mergeRulesByPattern` 按 `controllerPattern` 去重，B 不覆盖 A 已命中 pattern |
+| 同上 | `resolveJavaPathRules`：`roots = [projectRoot, ...extraSourceRoots.map(resolve)]` |
+| `arch-engine/tests/scanners/java-path-rules.test.ts` | 新增 WebProperties-only fixture 单测（仓库无 `WebMvcRegistrations` 字符串） |
 
-无 flaky 重试。
+## 验证
 
-## inject
-
-```bash
-node scripts/inject-platform-assets.cjs f:\software\claude_plugin f:\software\claude_plugin
+```powershell
+cd arch-engine; npm test -- tests/scanners/java-path-rules.test.ts
 ```
 
-输出已写入 `.agents/`、`.zcode/`、`.claude/`、`.qoder/`、`AGENTS.md`。
+结果：**8/8 PASS**
 
-## 提交范围（page-factory 2.0.6）
+## 后续（Task 8–9）
 
-- `.agents/skills/apt-v0-handoff/`（新增）
-- `.zcode/skills/apt-v0-handoff/`（新增）
-- Task 4/5 模板 inject：`plan-from-spec`、`feature`、`design-page`、`verify`（commands + skills，四平台）
-- `AGENTS.md`：`apt-v0-handoff` 行 + verify 闭环第 5 步
-- `docs/apt/plans/2026-07-03-apt-2.0.6-page-factory-plan.md`
+- Task 8：探测器 C `WebMvcConfigurer`
+- Task 9：`AutoConfiguration.imports` 链 + `extraSourceRoots` fixture 集成
 
-**未纳入本次提交**（与 2.0.6 page-factory 无关或另批）：
+## 状态
 
-- `.apt/`、`.apt/verify/`
-- `apt-goal`、`apt-current-status`、`auto-brainstorm` 相关 inject 产物
-- `apt-auto-brainstorm` 仅空白符 normalize
-
-## 禁止项
-
-- 未调用 `audit_arch_changes`
+**DONE**
