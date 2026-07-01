@@ -1,6 +1,7 @@
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { ArchConfig } from "../../src/types.js";
 import {
@@ -11,6 +12,22 @@ import {
   resolveJavaPathRules,
 } from "../../src/scanners/java-path-rules.js";
 import { writePathRulesSnapshot } from "../../src/writer/path-rules.js";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const configurerOnlyFixture = path.join(
+  __dirname,
+  "..",
+  "fixtures",
+  "java-path-rules",
+  "configurer-only"
+);
+const starterOnlyFixture = path.join(
+  __dirname,
+  "..",
+  "fixtures",
+  "java-path-rules",
+  "starter-only"
+);
 
 const WEB_PROPERTIES = `
 @ConfigurationProperties(prefix = "base.web")
@@ -200,5 +217,52 @@ describe("java-path-rules", () => {
     const appRule = snapshot.rules.find((r) => r.source.includes("appApi"));
     expect(appRule?.file).toMatch(/WebProperties\.java$/);
     expect(appRule?.overrides).toBeNull();
+  });
+
+  it("resolveJavaPathRules discovers WebMvcConfigurer addPathPrefix without WebMvcRegistrations", async () => {
+    const configContent = await fs.readFile(
+      path.join(
+        configurerOnlyFixture,
+        "src/main/java/cn/example/framework/web/config/WebMvcConfig.java"
+      ),
+      "utf-8"
+    );
+    expect(configContent).toMatch(/implements\s+WebMvcConfigurer/);
+    expect(configContent).toMatch(/addPathPrefix/);
+    expect(configContent).not.toMatch(/WebMvcRegistrations/);
+
+    const rules = await resolveJavaPathRules(configurerOnlyFixture);
+    expect(rules.confidence).toBe("medium");
+    expect(rules.controllerPrefixes).toHaveLength(1);
+    expect(rules.controllerPrefixes[0]?.prefix).toBe("/admin-api");
+    expect(rules.controllerPrefixes[0]?.controllerPattern).toBe(
+      "**.controller.admin.**"
+    );
+    expect(rules.controllerPrefixes[0]?.source).toContain(":configurer");
+    expect(rules.controllerPrefixes[0]?.file).toMatch(/WebMvcConfig\.java$/);
+  });
+
+  it("resolveJavaPathRules on starter-only fixture finds /admin-api via AutoConfiguration chain", async () => {
+    const autoConfig = await fs.readFile(
+      path.join(
+        starterOnlyFixture,
+        "src/main/java/com/example/framework/web/config/BaseWebAutoConfiguration.java"
+      ),
+      "utf-8"
+    );
+    expect(autoConfig).not.toMatch(/WebMvcRegistrations/);
+    expect(autoConfig).toMatch(/@AutoConfiguration/);
+
+    const rules = await resolveJavaPathRules(starterOnlyFixture);
+    expect(rules.confidence).toBe("high");
+    expect(rules.controllerPrefixes.map((r) => r.prefix).sort()).toEqual([
+      "/admin-api",
+      "/app-api",
+    ]);
+    expect(
+      rules.controllerPrefixes.some((r) =>
+        r.source.includes("WebProperties.java")
+      )
+    ).toBe(true);
   });
 });

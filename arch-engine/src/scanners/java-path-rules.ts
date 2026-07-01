@@ -3,6 +3,10 @@ import path from "node:path";
 import fg from "fast-glob";
 import YAML from "yaml";
 import type { ArchConfig, ControllerPathPrefixConfig } from "../types.js";
+import {
+  readAutoConfigurationImports,
+  readSpringFactoriesAutoConfiguration,
+} from "./java-starter.js";
 
 /** One controller-package → URL prefix rule (Spring PathMatch / WebMvcRegistrations). */
 export interface ControllerPathPrefixRule {
@@ -25,6 +29,9 @@ export interface ResolvedJavaPathRules {
 }
 
 const WEB_MVC_REGISTRATIONS_RE = /WebMvcRegistrations/;
+const WEB_MVC_CONFIGURER_RE = /implements\s+WebMvcConfigurer/;
+const CONFIGURER_PATH_SIGNAL_RE =
+  /(?:addPathPrefix|pathPrefixes\.put|configurePathMatch)/;
 const CONFIG_PROPERTIES_RE =
   /@ConfigurationProperties\s*\(\s*prefix\s*=\s*["']([^"']+)["']/;
 
@@ -149,6 +156,55 @@ async function findJavaFileByClassName(
   return null;
 }
 
+async function findJavaFileByFqcn(
+  roots: string[],
+  fqcn: string
+): Promise<string | null> {
+  const simpleName = fqcn.split(".").pop();
+  const packageName = fqcn.slice(0, fqcn.lastIndexOf("."));
+  if (!simpleName) return null;
+
+  const relPath = `${packageName.replace(/\./g, "/")}/${simpleName}.java`;
+  for (const root of roots) {
+    const standard = path.join(root, "src/main/java", relPath);
+    try {
+      await fs.access(standard);
+      return standard;
+    } catch {
+      /* try broader search */
+    }
+  }
+
+  for (const root of roots) {
+    const hits = await fg.glob(`**/${simpleName}.java`, {
+      cwd: root,
+      absolute: true,
+      ignore: ["**/target/**", "**/node_modules/**"],
+    });
+    for (const hit of hits) {
+      if (extractJavaPackage(await fs.readFile(hit, "utf-8")) === packageName) {
+        return hit;
+      }
+    }
+  }
+  return null;
+}
+
+async function findMavenModuleDirs(roots: string[]): Promise<string[]> {
+  const dirs = new Set<string>();
+  for (const root of roots) {
+    const poms = await fg.glob("**/pom.xml", {
+      cwd: root,
+      absolute: true,
+      ignore: ["**/target/**", "**/node_modules/**"],
+    });
+    for (const pom of poms) {
+      dirs.add(path.dirname(pom));
+    }
+  }
+  return [...dirs];
+}
+
 async function globJavaFiles(roots: string[]): Promise<string[]> {
   const files: string[] = [];
   for (const root of roots) {
@@ -168,6 +224,86 @@ function classNameFromJavaFile(file: string): string {
 
 function isWebPropertiesDirectCandidate(content: string): boolean {
   return CONFIG_PROPERTIES_RE.test(content) && /new\s+Api\s*\(/.test(content);
+}
+
+async function collectRulesFromPropertiesFile(
+  file: string,
+  content: string,
+  projectRoot: string
+): Promise<ControllerPathPrefixRule[]> {
+  const className = classNameFromJavaFile(file);
+  const cpMatch = content.match(CONFIG_PROPERTIES_RE);
+  const configPrefix = cpMatch?.[1];
+
+  let rules = rulesFromPropertiesJava(content, className, file);
+  if (configPrefix) {
+    const ymlFlat = await loadYamlConfigKeys(projectRoot, configPrefix);
+    rules = applyYmlOverridesToRules(rules, ymlFlat, configPrefix);
+  }
+  return rules;
+}
+
+async function applyDetectorB(
+  file: string,
+  content: string,
+  projectRoot: string,
+  controllerPrefixes: ControllerPathPrefixRule[],
+  sources: string[],
+  confidence: ResolvedJavaPathRules["confidence"]
+): Promise<{
+  controllerPrefixes: ControllerPathPrefixRule[];
+  sources: string[];
+  confidence: ResolvedJavaPathRules["confidence"];
+}> {
+  if (!isWebPropertiesDirectCandidate(content)) {
+    return { controllerPrefixes, sources, confidence };
+  }
+
+  const rules = await collectRulesFromPropertiesFile(file, content, projectRoot);
+  if (rules.length === 0) {
+    return { controllerPrefixes, sources, confidence };
+  }
+
+  const before = controllerPrefixes.length;
+  const merged = mergeRulesByPattern(controllerPrefixes, rules);
+  if (merged.length > before) {
+    sources.push(file);
+    if (confidence !== "high") {
+      return { controllerPrefixes: merged, sources, confidence: "high" };
+    }
+    return { controllerPrefixes: merged, sources, confidence };
+  }
+  return { controllerPrefixes: merged, sources, confidence };
+}
+
+function applyDetectorC(
+  file: string,
+  content: string,
+  controllerPrefixes: ControllerPathPrefixRule[],
+  sources: string[],
+  confidence: ResolvedJavaPathRules["confidence"]
+): {
+  controllerPrefixes: ControllerPathPrefixRule[];
+  sources: string[];
+  confidence: ResolvedJavaPathRules["confidence"];
+} {
+  if (!isWebMvcConfigurerCandidate(content)) {
+    return { controllerPrefixes, sources, confidence };
+  }
+
+  const rules = rulesFromWebMvcConfigurer(content, file);
+  if (rules.length === 0) {
+    return { controllerPrefixes, sources, confidence };
+  }
+
+  const before = controllerPrefixes.length;
+  const merged = mergeRulesByPattern(controllerPrefixes, rules);
+  if (merged.length > before) {
+    sources.push(file);
+    const nextConfidence = confidence === "high" ? "high" : "medium";
+    return { controllerPrefixes: merged, sources, confidence: nextConfidence };
+  }
+  return { controllerPrefixes: merged, sources, confidence };
 }
 
 function mergeRulesByPattern(
@@ -334,16 +470,75 @@ function rulesFromPropertiesJava(
   return rules.map((r) => ({ ...r, source: `${file} ${r.source}` }));
 }
 
+function inferControllerPatternFromPrefix(prefix: string): string {
+  if (prefix.includes("admin")) return "**.controller.admin.**";
+  if (prefix.includes("app")) return "**.controller.app.**";
+  if (prefix.includes("pc")) return "**.controller.pc.**";
+  return "**.controller.**";
+}
+
+function inferControllerPatternFromSecondArg(secondArg: string): string | null {
+  const strLit = secondArg.match(/^["']([^"']+)["']/);
+  if (strLit) return strLit[1]!;
+
+  if (/controller\.admin/.test(secondArg)) return "**.controller.admin.**";
+  if (/controller\.app/.test(secondArg)) return "**.controller.app.**";
+  if (/controller\.pc/.test(secondArg)) return "**.controller.pc.**";
+
+  return null;
+}
+
+function parseSecondArgAfterPrefix(content: string, matchEnd: number): string | null {
+  const after = content.slice(matchEnd);
+  const commaMatch = after.match(/^\s*,\s*/);
+  if (!commaMatch) return null;
+
+  const rest = after.slice(commaMatch[0].length);
+  const closeParen = rest.indexOf(")");
+  const expr = closeParen >= 0 ? rest.slice(0, closeParen) : rest.slice(0, 200);
+  return inferControllerPatternFromSecondArg(expr);
+}
+
+function isWebMvcConfigurerCandidate(content: string): boolean {
+  return (
+    WEB_MVC_CONFIGURER_RE.test(content) && CONFIGURER_PATH_SIGNAL_RE.test(content)
+  );
+}
+
 function rulesFromInlineWebMvc(content: string, file: string): ControllerPathPrefixRule[] {
   const rules: ControllerPathPrefixRule[] = [];
   for (const m of content.matchAll(INLINE_PREFIX_RE)) {
     const prefix = m[1]!;
-    let pattern = "**.controller.**";
-    if (prefix.includes("admin")) pattern = "**.controller.admin.**";
-    else if (prefix.includes("app")) pattern = "**.controller.app.**";
-    else if (prefix.includes("pc")) pattern = "**.controller.pc.**";
+    const pattern = inferControllerPatternFromPrefix(prefix);
     rules.push({ prefix, controllerPattern: pattern, source: `${file}:inline` });
   }
+  return rules;
+}
+
+function rulesFromWebMvcConfigurer(
+  content: string,
+  file: string
+): ControllerPathPrefixRule[] {
+  const rules: ControllerPathPrefixRule[] = [];
+  const seen = new Set<string>();
+
+  for (const m of content.matchAll(INLINE_PREFIX_RE)) {
+    const prefix = m[1]!;
+    const matchEnd = (m.index ?? 0) + m[0].length;
+    const pattern =
+      parseSecondArgAfterPrefix(content, matchEnd) ??
+      inferControllerPatternFromPrefix(prefix);
+    const key = `${prefix}|${pattern}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    rules.push({
+      prefix,
+      controllerPattern: pattern,
+      source: `${file}:configurer`,
+      file,
+    });
+  }
+
   return rules;
 }
 
@@ -405,7 +600,7 @@ export async function discoverAutoPathRules(
   roots: string[]
 ): Promise<ResolvedJavaPathRules> {
   const projectRoot = roots[0] ?? ".";
-  const sources: string[] = [];
+  let sources: string[] = [];
   let controllerPrefixes: ControllerPathPrefixRule[] = [];
   let confidence: ResolvedJavaPathRules["confidence"] = "low";
 
@@ -457,24 +652,92 @@ export async function discoverAutoPathRules(
   // Detector B: @ConfigurationProperties + new Api(...) without WebMvcRegistrations chain
   for (const file of javaFiles) {
     const content = await fs.readFile(file, "utf-8");
-    if (!isWebPropertiesDirectCandidate(content)) continue;
+    const result = await applyDetectorB(
+      file,
+      content,
+      projectRoot,
+      controllerPrefixes,
+      sources,
+      confidence
+    );
+    controllerPrefixes = result.controllerPrefixes;
+    sources = result.sources;
+    confidence = result.confidence;
+  }
 
-    const className = classNameFromJavaFile(file);
-    const cpMatch = content.match(CONFIG_PROPERTIES_RE);
-    const configPrefix = cpMatch?.[1];
+  // Detector C: WebMvcConfigurer with addPathPrefix / pathPrefixes / configurePathMatch
+  for (const file of javaFiles) {
+    const content = await fs.readFile(file, "utf-8");
+    const result = applyDetectorC(
+      file,
+      content,
+      controllerPrefixes,
+      sources,
+      confidence
+    );
+    controllerPrefixes = result.controllerPrefixes;
+    sources = result.sources;
+    confidence = result.confidence;
+  }
 
-    let rules = rulesFromPropertiesJava(content, className, file);
-    if (configPrefix) {
-      const ymlFlat = await loadYamlConfigKeys(projectRoot, configPrefix);
-      rules = applyYmlOverridesToRules(rules, ymlFlat, configPrefix);
-    }
+  // Detector D: AutoConfiguration.imports / spring.factories → config class → B/C
+  const moduleDirs = await findMavenModuleDirs(roots);
+  const processedFqcn = new Set<string>();
 
-    if (rules.length > 0) {
-      const before = controllerPrefixes.length;
-      controllerPrefixes = mergeRulesByPattern(controllerPrefixes, rules);
-      if (controllerPrefixes.length > before) {
-        sources.push(file);
-        if (confidence !== "high") confidence = "high";
+  for (const moduleDir of moduleDirs) {
+    const imports = await readAutoConfigurationImports(moduleDir);
+    const factories = await readSpringFactoriesAutoConfiguration(moduleDir);
+    const autoConfigClasses = [...new Set([...imports, ...factories])];
+
+    for (const fqcn of autoConfigClasses) {
+      if (processedFqcn.has(fqcn)) continue;
+      processedFqcn.add(fqcn);
+
+      const configFile = await findJavaFileByFqcn(roots, fqcn);
+      if (!configFile) continue;
+
+      const configContent = await fs.readFile(configFile, "utf-8");
+
+      const bResult = await applyDetectorB(
+        configFile,
+        configContent,
+        projectRoot,
+        controllerPrefixes,
+        sources,
+        confidence
+      );
+      controllerPrefixes = bResult.controllerPrefixes;
+      sources = bResult.sources;
+      confidence = bResult.confidence;
+
+      const cResult = applyDetectorC(
+        configFile,
+        configContent,
+        controllerPrefixes,
+        sources,
+        confidence
+      );
+      controllerPrefixes = cResult.controllerPrefixes;
+      sources = cResult.sources;
+      confidence = cResult.confidence;
+
+      const propsClassName = findReferencedPropertiesClass(configContent);
+      if (propsClassName) {
+        const propsFile = await findJavaFileByClassName(roots, propsClassName);
+        if (propsFile) {
+          const propsContent = await fs.readFile(propsFile, "utf-8");
+          const propsResult = await applyDetectorB(
+            propsFile,
+            propsContent,
+            projectRoot,
+            controllerPrefixes,
+            sources,
+            confidence
+          );
+          controllerPrefixes = propsResult.controllerPrefixes;
+          sources = propsResult.sources;
+          confidence = propsResult.confidence;
+        }
       }
     }
   }

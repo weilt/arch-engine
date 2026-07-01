@@ -33,7 +33,7 @@ export async function isStarterModule(
   return artifactId?.endsWith("-starter") ?? false;
 }
 
-async function readAutoConfigurationImports(moduleDir: string): Promise<string[]> {
+export async function readAutoConfigurationImports(moduleDir: string): Promise<string[]> {
   const importsPath = path.join(
     moduleDir,
     "src/main/resources/META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports"
@@ -77,7 +77,7 @@ function parseSpringFactoriesEnableAutoConfiguration(content: string): string[] 
   return classes;
 }
 
-async function readSpringFactoriesAutoConfiguration(moduleDir: string): Promise<string[]> {
+export async function readSpringFactoriesAutoConfiguration(moduleDir: string): Promise<string[]> {
   const factoriesPath = path.join(moduleDir, "src/main/resources/META-INF/spring.factories");
   try {
     const content = await fs.readFile(factoriesPath, "utf-8");
