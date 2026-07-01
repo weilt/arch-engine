@@ -20,6 +20,10 @@ import { handleAuditDesignChanges } from "./design-audit.js";
 import { handleQueryProjectStatus } from "./status/aggregate.js";
 import { handleQueryOntology } from "./ontology-query.js";
 import { handleQueryImpact } from "./impact-query.js";
+import {
+  handleQueryPathRules,
+  handleUpdateJavaPathRules,
+} from "./path-rules.js";
 
 const projectRoot = getProjectRoot();
 
@@ -555,6 +559,68 @@ server.tool(
     } catch (err) {
       return {
         content: [{ type: "text" as const, text: String(err) }],
+        isError: true,
+      };
+    }
+  }
+);
+
+server.tool(
+  "update_java_path_rules",
+  "Declare Java controller path prefixes in arch.config and optionally reindex APIs",
+  {
+    rules: z
+      .array(
+        z.object({
+          prefix: z.string().describe('URL prefix, e.g. "/admin-api"'),
+          controllerPattern: z
+            .string()
+            .describe('Ant-style pattern, e.g. "**.controller.admin.**"'),
+          note: z.string().optional(),
+        })
+      )
+      .describe("Rules upserted into arch.config.java.controllerPathPrefixes"),
+    mode: z
+      .enum(["merge", "replace-manual"])
+      .optional()
+      .describe('Default "merge"; "replace-manual" clears manual rules first'),
+    reindex: z
+      .boolean()
+      .optional()
+      .describe("Default true; runs reindex-apis after updating config"),
+    extraSourceRoots: z
+      .array(z.string())
+      .optional()
+      .describe("Optional update to java.extraSourceRoots"),
+  },
+  async (input) => {
+    try {
+      const result = await handleUpdateJavaPathRules(projectRoot, input);
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+      };
+    } catch (err) {
+      return {
+        content: [{ type: "text" as const, text: `❌ ${String(err)}` }],
+        isError: true,
+      };
+    }
+  }
+);
+
+server.tool(
+  "query_path_rules",
+  "Read path-rules.json snapshot, arch.config java section, and last-scan pathRulesHash (read-only)",
+  {},
+  async () => {
+    try {
+      const result = await handleQueryPathRules(projectRoot);
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+      };
+    } catch (err) {
+      return {
+        content: [{ type: "text" as const, text: `❌ ${String(err)}` }],
         isError: true,
       };
     }
