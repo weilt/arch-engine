@@ -441,6 +441,7 @@ export async function runStartInit(
       prefixes: javaPathRules.controllerPrefixes.map((r) => ({
         prefix: r.prefix,
         pattern: r.controllerPattern,
+        source: r.source,
       })),
       pathRulesHash,
     });

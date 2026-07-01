@@ -343,10 +343,9 @@ function parseYmlFlat(root: unknown, prefix: string): Record<string, string> {
   return out;
 }
 
-async function loadYamlConfigKeys(
-  projectRoot: string,
-  configPrefix: string
-): Promise<Record<string, string>> {
+async function loadYamlApplicationFiles(
+  projectRoot: string
+): Promise<Record<string, string>[]> {
   const files = await fg.glob(
     ["**/application.yml", "**/application.yaml", "**/application-*.yml", "**/application-*.yaml"],
     {
@@ -356,18 +355,94 @@ async function loadYamlConfigKeys(
     }
   );
 
-  const merged: Record<string, string> = {};
+  const flats: Record<string, string>[] = [];
   for (const file of files.slice(0, 20)) {
     try {
       const raw = await fs.readFile(file, "utf-8");
       const doc = YAML.parse(raw) as unknown;
-      const flat = parseYmlFlat(doc, configPrefix);
-      Object.assign(merged, flat);
+      flats.push(parseYmlFlat(doc, ""));
     } catch {
       /* skip invalid yaml */
     }
   }
+  return flats;
+}
+
+async function loadYamlConfigKeys(
+  projectRoot: string,
+  configPrefix: string
+): Promise<Record<string, string>> {
+  const flats = await loadYamlApplicationFiles(projectRoot);
+  const merged: Record<string, string> = {};
+  for (const flat of flats) {
+    for (const [key, value] of Object.entries(flat)) {
+      if (key.startsWith(configPrefix)) merged[key] = value;
+    }
+  }
   return merged;
+}
+
+/** `base.web.admin-api.prefix` or `foo.web.admin-api.prefix` */
+function isWebControllerPathYmlKey(key: string): boolean {
+  if (!key.endsWith(".prefix")) return false;
+  const base = key.slice(0, -".prefix".length);
+  return /\.web\.[^.]+$/.test(base);
+}
+
+function rulesFromYmlOnly(
+  ymlFlat: Record<string, string>
+): ControllerPathPrefixRule[] {
+  const rules: ControllerPathPrefixRule[] = [];
+  const seen = new Set<string>();
+
+  for (const [key, prefixValue] of Object.entries(ymlFlat)) {
+    if (!isWebControllerPathYmlKey(key)) continue;
+    const base = key.slice(0, -".prefix".length);
+    const controllerPattern = ymlFlat[`${base}.controller`];
+    if (!controllerPattern) continue;
+
+    const normalized = normalizeControllerPattern(controllerPattern);
+    if (seen.has(normalized)) continue;
+    seen.add(normalized);
+
+    const prefix =
+      prefixValue.startsWith("/") ? prefixValue : `/${prefixValue}`;
+    rules.push({
+      prefix,
+      controllerPattern,
+      source: `yml-only:${base}`,
+    });
+  }
+  return rules;
+}
+
+function applyDetectorE(
+  ymlFlats: Record<string, string>[],
+  controllerPrefixes: ControllerPathPrefixRule[],
+  sources: string[],
+  confidence: ResolvedJavaPathRules["confidence"]
+): {
+  controllerPrefixes: ControllerPathPrefixRule[];
+  sources: string[];
+  confidence: ResolvedJavaPathRules["confidence"];
+} {
+  const mergedYml: Record<string, string> = {};
+  for (const flat of ymlFlats) Object.assign(mergedYml, flat);
+
+  const ymlOnly = rulesFromYmlOnly(mergedYml);
+  if (ymlOnly.length === 0) {
+    return { controllerPrefixes, sources, confidence };
+  }
+
+  const before = controllerPrefixes.length;
+  const merged = mergeRulesByPattern(controllerPrefixes, ymlOnly);
+  if (merged.length <= before) {
+    return { controllerPrefixes: merged, sources, confidence };
+  }
+
+  sources.push("yml-only");
+  const nextConfidence = confidence === "high" ? "high" : "medium";
+  return { controllerPrefixes: merged, sources, confidence: nextConfidence };
 }
 
 function applyYmlOverridesToRules(
@@ -741,6 +816,18 @@ export async function discoverAutoPathRules(
       }
     }
   }
+
+  // Detector E: yml-only supplement (*.web.*.prefix + *.controller without Java Api defaults)
+  const ymlFlats = await loadYamlApplicationFiles(projectRoot);
+  const eResult = applyDetectorE(
+    ymlFlats,
+    controllerPrefixes,
+    sources,
+    confidence
+  );
+  controllerPrefixes = eResult.controllerPrefixes;
+  sources = eResult.sources;
+  confidence = eResult.confidence;
 
   const contextPath = await resolveContextPath(projectRoot);
   if (contextPath) sources.push(`context-path:${contextPath}`);

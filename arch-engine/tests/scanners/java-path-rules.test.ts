@@ -242,6 +242,88 @@ describe("java-path-rules", () => {
     expect(rules.controllerPrefixes[0]?.file).toMatch(/WebMvcConfig\.java$/);
   });
 
+  it("resolveJavaPathRules discovers yml-only rules when no Java Api defaults", async () => {
+    const ymlOnlyRoot = await fs.mkdtemp(
+      path.join(os.tmpdir(), "path-rules-yml-only-")
+    );
+    try {
+      await fs.mkdir(path.join(ymlOnlyRoot, "src/main/resources"), {
+        recursive: true,
+      });
+      await fs.writeFile(
+        path.join(ymlOnlyRoot, "src/main/resources/application.yml"),
+        `base:
+  web:
+    admin-api:
+      prefix: /admin-api
+      controller: "**.controller.admin.**"
+    app-api:
+      prefix: /app-api
+      controller: "**.controller.app.**"
+`
+      );
+
+      const rules = await resolveJavaPathRules(ymlOnlyRoot);
+      expect(rules.confidence).toBe("medium");
+      expect(rules.controllerPrefixes).toHaveLength(2);
+      expect(rules.controllerPrefixes.map((r) => r.prefix).sort()).toEqual([
+        "/admin-api",
+        "/app-api",
+      ]);
+      expect(
+        rules.controllerPrefixes.every((r) => r.source.startsWith("yml-only:"))
+      ).toBe(true);
+      expect(rules.sources).toContain("yml-only");
+    } finally {
+      await fs.rm(ymlOnlyRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("yml-only supplement skips segments already covered by Java Api defaults", async () => {
+    const ymlPlusJavaRoot = await fs.mkdtemp(
+      path.join(os.tmpdir(), "path-rules-yml-java-")
+    );
+    try {
+      const pkgDir = path.join(
+        ymlPlusJavaRoot,
+        "src/main/java/cn/example/framework/web/config"
+      );
+      await fs.mkdir(pkgDir, { recursive: true });
+      await fs.writeFile(path.join(pkgDir, "WebProperties.java"), WEB_PROPERTIES);
+      await fs.mkdir(path.join(ymlPlusJavaRoot, "src/main/resources"), {
+        recursive: true,
+      });
+      await fs.writeFile(
+        path.join(ymlPlusJavaRoot, "src/main/resources/application.yml"),
+        `base:
+  web:
+    admin-api:
+      prefix: /yml-admin-api
+      controller: "**.controller.admin.**"
+    extra-api:
+      prefix: /extra-api
+      controller: "**.controller.extra.**"
+`
+      );
+
+      const rules = await resolveJavaPathRules(ymlPlusJavaRoot);
+      expect(rules.confidence).toBe("high");
+      const adminRule = rules.controllerPrefixes.find(
+        (r) => r.controllerPattern === "**.controller.admin.**"
+      );
+      expect(adminRule?.prefix).toBe("/yml-admin-api");
+      expect(adminRule?.source).not.toMatch(/^yml-only:/);
+
+      const extraRule = rules.controllerPrefixes.find(
+        (r) => r.controllerPattern === "**.controller.extra.**"
+      );
+      expect(extraRule?.prefix).toBe("/extra-api");
+      expect(extraRule?.source).toMatch(/^yml-only:/);
+    } finally {
+      await fs.rm(ymlPlusJavaRoot, { recursive: true, force: true });
+    }
+  });
+
   it("resolveJavaPathRules on starter-only fixture finds /admin-api via AutoConfiguration chain", async () => {
     const autoConfig = await fs.readFile(
       path.join(
