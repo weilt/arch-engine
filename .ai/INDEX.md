@@ -31,3 +31,6 @@
 | Name | Reason | Reported |
 |------|--------|----------|
 | _None._ | | |
+
+| CallGraph | v2.0.5 Call graph data model: method/dto nodes + calls/imports/uses/template edges | rch-engine/src/types.ts |
+| OntologyTopology | v2.0.5 Ontology topology metrics: moduleCount/rpcEndpoints/entityCount/flowEdgeCount/crossServiceRefs/methodCount/dtoCount/callEdgeCount/importEdgeCount | mcp-server/src/ontology/types.ts |
