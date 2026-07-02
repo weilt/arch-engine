@@ -25,7 +25,10 @@ export {
 
 const MODULE_POM = "**/pom.xml";
 
-export async function findMavenModules(projectRoot: string): Promise<JavaModule[]> {
+export async function findMavenModules(
+  projectRoot: string,
+  repoSlug?: string
+): Promise<JavaModule[]> {
   const poms = await fg.glob(MODULE_POM, {
     cwd: projectRoot,
     absolute: true,
@@ -35,6 +38,7 @@ export async function findMavenModules(projectRoot: string): Promise<JavaModule[
     slug: path.basename(path.dirname(p)).toLowerCase(),
     name: path.basename(path.dirname(p)),
     path: path.relative(projectRoot, path.dirname(p)),
+    repoSlug,
   }));
 }
 

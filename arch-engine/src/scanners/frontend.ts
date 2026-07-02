@@ -191,7 +191,8 @@ export async function discoverFrontendCandidates(
 
 async function scanPackageDir(
   projectRoot: string,
-  pkgDir: string
+  pkgDir: string,
+  repoSlug?: string
 ): Promise<FrontendPackage | null> {
   const pkg = await readJson<PackageJson>(path.join(pkgDir, "package.json"));
   if (!pkg?.name) return null;
@@ -299,8 +300,9 @@ const seenComponentFiles = new Set<string>();
    utils,
    enums,
    apiClients,
-   routes,
-   stores,
+  routes,
+  stores,
+  repoSlug,
 };
 }
 
@@ -319,7 +321,8 @@ function workspacePackageJsonGlobs(patterns: string[]): string[] {
 // (vue/react), so a project whose frontend lives under e.g. "web/" is not
 // silently skipped.
 async function discoverChildFrontendPackages(
-  projectRoot: string
+  projectRoot: string,
+  repoSlug?: string
 ): Promise<FrontendPackage[]> {
   let entries;
   try {
@@ -336,7 +339,7 @@ async function discoverChildFrontendPackages(
     const pkg = await readJson<PackageJson>(path.join(childDir, "package.json"));
     if (!pkg?.name) continue;
     if (!inferFramework(pkg)) continue;
-    const scanned = await scanPackageDir(projectRoot, childDir);
+    const scanned = await scanPackageDir(projectRoot, childDir, repoSlug);
     if (scanned) packages.push(scanned);
   }
 
@@ -344,17 +347,20 @@ async function discoverChildFrontendPackages(
   return packages;
 }
 
-export async function scanFrontend(projectRoot: string): Promise<FrontendPackage[]> {
+export async function scanFrontend(
+  projectRoot: string,
+  repoSlug?: string
+): Promise<FrontendPackage[]> {
   const patterns = await getWorkspacePatterns(projectRoot);
 
   if (patterns.length === 0) {
     const rootPkg = await readJson<PackageJson>(path.join(projectRoot, "package.json"));
     if (rootPkg?.name) {
-      const pkg = await scanPackageDir(projectRoot, projectRoot);
+      const pkg = await scanPackageDir(projectRoot, projectRoot, repoSlug);
       return pkg ? [pkg] : [];
     }
     // Non-JS repo root: auto-discover direct child frontend packages.
-    const discovered = await discoverChildFrontendPackages(projectRoot);
+    const discovered = await discoverChildFrontendPackages(projectRoot, repoSlug);
     if (discovered.length > 0) {
       archLog.info("frontend: discovered non-root frontend packages", {
         slugs: discovered.map((p) => p.slug),
@@ -374,7 +380,7 @@ export async function scanFrontend(projectRoot: string): Promise<FrontendPackage
 
   const packages: FrontendPackage[] = [];
   for (const pkgJsonPath of pkgJsonPaths) {
-    const scanned = await scanPackageDir(projectRoot, path.dirname(pkgJsonPath));
+    const scanned = await scanPackageDir(projectRoot, path.dirname(pkgJsonPath), repoSlug);
     if (scanned) packages.push(scanned);
   }
 
