@@ -38,18 +38,28 @@ import { mergeDocumentModel } from "./scanners/merge.js";
 import { scanOpenApiGlobs } from "./scanners/openapi.js";
 import { mergeEntityGraphs } from "./scanners/entity-merge.js";
 import { createScannerRegistry, type ScannerContext } from "./scanners/registry.js";
+import { loadWorkspace, resolveRepoRoot } from "./workspace.js";
+import { scanGoSources } from "./scanners/go-scanner.js";
+import { scanPythonSources } from "./scanners/python-scanner.js";
 import type {
+  ApiEndpoint,
   ArchChunk,
   ArchConfig,
   AssetCard,
   CallGraphEdge,
   CallGraphNode,
+  DocumentModel,
   EntityDef,
   EntityRelation,
+  FlowEdge,
+  FlowNode,
   FrontendPackage,
   JavaModule,
   LastScanState,
   RawCandidate,
+  RpcEndpoint,
+  WorkspaceConfig,
+  WorkspaceRepo,
 } from "./types.js";
 import { VectorStore } from "./vector/sqlite-store.js";
 import { assetCardsToChunks } from "./asset/chunks-from-cards.js";
@@ -391,6 +401,443 @@ export async function runModuleBatch(
   return { cards, chunks };
 }
 
+// v2.1.0: workspace-mode accumulators. Each repo is scanned independently and
+// its results are appended here; the merged DocumentModel is built once all
+// repos are processed.
+interface WorkspaceAccumulator {
+  modules: JavaModule[];
+  apis: ApiEndpoint[];
+  rpcs: RpcEndpoint[];
+  packages: FrontendPackage[];
+  entityDefs: EntityDef[];
+  entityRelations: EntityRelation[];
+  flowNodes: FlowNode[];
+  flowEdges: FlowEdge[];
+  callNodes: CallGraphNode[];
+  callEdges: CallGraphEdge[];
+  packageDirs: Map<string, string>;
+}
+
+/**
+ * v2.1.0: Workspace-mode entry point. When apt-workspace.json is present,
+ * runStartInit delegates here instead of running the single-repo pipeline.
+ * Each repo is scanned independently by language, a failure in one repo never
+ * aborts the others, and all results are merged into one DocumentModel written
+ * under the workspace .ai/arch tree. Single-repo mode is untouched.
+ *
+ * v2.1.0 performs the scan + merge + arch-tree/entity/flow/call-graph writes.
+ * The asset summarization / embedding (vector store) phase is deferred to a
+ * later task, so chunkCount stays 0 for now.
+ */
+export async function runWorkspaceInit(
+  projectRoot: string,
+  workspace: WorkspaceConfig,
+  config: ArchConfig,
+  _deps: PipelineDeps,
+  _options: PipelineOptions
+): Promise<StartInitReport> {
+  archLog.info("start-init: workspace mode", {
+    repoCount: workspace.repos.length,
+    repos: workspace.repos.map((r) => ({ path: r.path, lang: r.lang, slug: r.slug })),
+  });
+
+  const acc: WorkspaceAccumulator = {
+    modules: [],
+    apis: [],
+    rpcs: [],
+    packages: [],
+    entityDefs: [],
+    entityRelations: [],
+    flowNodes: [],
+    flowEdges: [],
+    callNodes: [],
+    callEdges: [],
+    packageDirs: new Map(),
+  };
+
+  for (const repo of workspace.repos) {
+    const repoRoot = resolveRepoRoot(projectRoot, repo.path);
+    try {
+      await fs.access(repoRoot);
+    } catch {
+      archLog.warn("start-init: workspace repo directory missing, skipping", {
+        repo: repo.path,
+        slug: repo.slug,
+      });
+      continue;
+    }
+
+    try {
+      if (repo.lang === "java") {
+        await scanWorkspaceJavaRepo(repo, repoRoot, config, acc);
+      } else if (repo.lang === "go") {
+        await scanWorkspaceGoRepo(repo, repoRoot, acc);
+      } else if (repo.lang === "python") {
+        await scanWorkspacePythonRepo(repo, repoRoot, acc);
+      } else if (repo.lang === "ts") {
+        await scanWorkspaceTsRepo(repo, repoRoot, config, acc);
+      }
+    } catch (e) {
+      archLog.warn("start-init: workspace repo scan failed (non-fatal)", {
+        repo: repo.path,
+        slug: repo.slug,
+        error: e instanceof Error ? e.message : String(e),
+      });
+    }
+  }
+
+  const model: DocumentModel = {
+    modules: acc.modules,
+    apis: acc.apis,
+    rpcs: acc.rpcs,
+    packages: acc.packages,
+    workspace,
+    ...(acc.entityDefs.length > 0
+      ? { entities: { entities: acc.entityDefs, relations: acc.entityRelations } }
+      : {}),
+    ...(acc.flowNodes.length > 0
+      ? { flows: { nodes: acc.flowNodes, edges: acc.flowEdges } }
+      : {}),
+    ...(acc.callNodes.length > 0
+      ? { callGraph: { nodes: acc.callNodes, edges: acc.callEdges } }
+      : {}),
+  };
+
+  await cleanArchDir(projectRoot);
+  await writeMarkdownTree(projectRoot, model);
+  const index = buildArchIndex(model);
+  await writeArchIndex(projectRoot, index);
+
+  if (model.entities) {
+    try {
+      await writeEntityDocs(projectRoot, model.entities);
+    } catch (e) {
+      archLog.warn("start-init: workspace entity doc write failed", {
+        error: e instanceof Error ? e.message : String(e),
+      });
+    }
+  }
+  if (model.flows) {
+    try {
+      await writeFlowDocs(projectRoot, model.flows);
+    } catch (e) {
+      archLog.warn("start-init: workspace flow doc write failed", {
+        error: e instanceof Error ? e.message : String(e),
+      });
+    }
+  }
+  if (model.callGraph) {
+    try {
+      await writeCallGraph(projectRoot, model.callGraph);
+    } catch (e) {
+      archLog.warn("start-init: workspace call-graph doc write failed", {
+        error: e instanceof Error ? e.message : String(e),
+      });
+    }
+  }
+
+  archLog.info("start-init: workspace scan complete", {
+    repos: workspace.repos.length,
+    modules: model.modules.length,
+    apis: model.apis.length,
+    packages: model.packages.length,
+    entities: model.entities?.entities.length ?? 0,
+    callGraphNodes: model.callGraph?.nodes.length ?? 0,
+  });
+
+  return {
+    status: "ok",
+    chunkCount: 0,
+    apiCount: model.apis.length,
+    moduleCount: model.modules.length,
+  };
+}
+
+/**
+ * Java repo: Maven modules + Java source scan, then the entity/flow/call-graph
+ * Scanner Registry phases scoped to this repo root. Mirrors the single-repo
+ * pipeline but with projectRoot = repoRoot and repoSlug set on every module.
+ */
+async function scanWorkspaceJavaRepo(
+  repo: WorkspaceRepo,
+  repoRoot: string,
+  config: ArchConfig,
+  acc: WorkspaceAccumulator
+): Promise<void> {
+  if (!config.scanners.java) return;
+
+  const repoModules = await findMavenModules(repoRoot, repo.slug);
+  const pathRules = await resolveJavaPathRules(repoRoot, config);
+  await writePathRulesSnapshot(repoRoot, pathRules);
+  const { apis: repoApis, rpcs: repoRpcs } = await scanJavaSources(
+    repoRoot,
+    repoModules,
+    pathRules,
+    config
+  );
+
+  acc.modules.push(...repoModules);
+  acc.apis.push(...repoApis);
+  acc.rpcs.push(...repoRpcs);
+
+  const registry = createScannerRegistry();
+  const repoModel: DocumentModel = {
+    modules: repoModules,
+    apis: repoApis,
+    rpcs: repoRpcs,
+    packages: [],
+  };
+  const ctx: ScannerContext = {
+    projectRoot: repoRoot,
+    modules: repoModules,
+    model: repoModel,
+    repoLang: "java",
+    repoSlug: repo.slug,
+  };
+
+  // Entity phase: JPA > MyBatis > SQL, then collect entity names for flows.
+  const entityNames = new Set<string>();
+  const entityResults: Record<
+    string,
+    { entities: EntityDef[]; relations: EntityRelation[] }
+  > = {};
+  for (const plugin of registry) {
+    if (plugin.phase !== "entity") continue;
+    try {
+      const result = await plugin.scan(ctx);
+      if (result.entities?.entities) {
+        entityResults[plugin.name] = {
+          entities: result.entities.entities,
+          relations: result.entities.relations ?? [],
+        };
+      }
+    } catch (e) {
+      archLog.warn(`start-init: ${plugin.name} failed (non-fatal)`, {
+        repo: repo.slug,
+        error: e instanceof Error ? e.message : String(e),
+      });
+    }
+  }
+  try {
+    const merged = mergeEntityGraphs(
+      entityResults["entity-jpa"] ?? { entities: [], relations: [] },
+      entityResults["entity-mybatis"] ?? { entities: [], relations: [] },
+      entityResults["entity-sql"] ?? { entities: [], relations: [] }
+    );
+    if (merged.entities.length > 0) {
+      acc.entityDefs.push(...merged.entities);
+      acc.entityRelations.push(...merged.relations);
+      for (const e of merged.entities) entityNames.add(e.name);
+    }
+  } catch (e) {
+    archLog.warn("start-init: workspace entity merge failed (non-fatal)", {
+      repo: repo.slug,
+      error: e instanceof Error ? e.message : String(e),
+    });
+  }
+
+  // Flow phase: derive cross-layer flows from the entities of this repo.
+  if (entityNames.size > 0) {
+    const flowCtx: ScannerContext = { ...ctx, entityNames: [...entityNames] };
+    for (const plugin of registry) {
+      if (plugin.phase !== "flow") continue;
+      try {
+        const result = await plugin.scan(flowCtx);
+        if (result.flows?.nodes && result.flows.nodes.length > 0) {
+          acc.flowNodes.push(...result.flows.nodes);
+          acc.flowEdges.push(...(result.flows.edges ?? []));
+        }
+      } catch (e) {
+        archLog.warn(`start-init: ${plugin.name} failed (non-fatal)`, {
+          repo: repo.slug,
+          error: e instanceof Error ? e.message : String(e),
+        });
+      }
+    }
+  }
+
+  // Call-graph phase: Java method/DTO graph for this repo.
+  for (const plugin of registry) {
+    if (plugin.phase !== "call-graph") continue;
+    try {
+      const result = await plugin.scan(ctx);
+      if (result.callGraph?.nodes && result.callGraph.nodes.length > 0) {
+        acc.callNodes.push(...result.callGraph.nodes);
+        acc.callEdges.push(...result.callGraph.edges);
+      }
+    } catch (e) {
+      archLog.warn(`start-init: ${plugin.name} failed (non-fatal)`, {
+        repo: repo.slug,
+        error: e instanceof Error ? e.message : String(e),
+      });
+    }
+  }
+}
+
+/**
+ * Go repo: one scanGoSources pass, then its APIs/structs/methods are converted
+ * into the unified model shapes. ApiEndpoint has no repoSlug field in v2.1.0,
+ * so the moduleSlug (== repo slug) carries repo attribution.
+ */
+async function scanWorkspaceGoRepo(
+  repo: WorkspaceRepo,
+  repoRoot: string,
+  acc: WorkspaceAccumulator
+): Promise<void> {
+  const result = await scanGoSources(repoRoot, repo.slug);
+
+  // GoModule is structurally compatible with JavaModule (slug/name/path +
+  // repoSlug), so it merges directly into the unified module list.
+  acc.modules.push(...result.modules);
+
+  for (const goApi of result.apis) {
+    acc.apis.push({
+      id: goApi.id,
+      method: goApi.method,
+      path: goApi.path,
+      summary: `${goApi.method} ${goApi.path}`,
+      tags: [],
+      audience: goApi.path.includes("/internal") ? "internal" : "frontend-facing",
+      source: "java",
+      moduleSlug: goApi.moduleSlug,
+    });
+  }
+
+  // Go structs -> entities (same conversion as the registry go-scanner plugin).
+  for (const s of result.structs) {
+    acc.entityDefs.push({
+      name: s.name,
+      table: s.name,
+      moduleSlug: s.moduleSlug,
+      filePath: s.filePath,
+      fields: s.fields.map((f) => ({ name: f.name, type: f.type })),
+      source: "sql",
+    });
+  }
+
+  // Go methods + call edges -> call graph.
+  for (const m of result.methods) {
+    acc.callNodes.push({
+      id: m.id,
+      kind: "method",
+      name: m.receiver ? `${m.receiver}.${m.name}` : m.name,
+      filePath: m.filePath,
+      moduleSlug: m.moduleSlug,
+      signature: m.signature,
+    });
+  }
+  for (const e of result.callEdges) {
+    acc.callEdges.push({
+      from: e.source,
+      to: e.target,
+      kind: "calls",
+      confidence: "high",
+    });
+  }
+}
+
+/** Python repo: one scanPythonSources pass, converted into the unified shapes. */
+async function scanWorkspacePythonRepo(
+  repo: WorkspaceRepo,
+  repoRoot: string,
+  acc: WorkspaceAccumulator
+): Promise<void> {
+  const result = await scanPythonSources(repoRoot, repo.slug);
+
+  // PythonModule is structurally compatible with JavaModule.
+  acc.modules.push(...result.modules);
+
+  for (const pyApi of result.apis) {
+    acc.apis.push({
+      id: pyApi.id,
+      method: pyApi.method,
+      path: pyApi.path,
+      summary: `${pyApi.method} ${pyApi.path}`,
+      tags: [],
+      audience: pyApi.path.includes("/internal") ? "internal" : "frontend-facing",
+      source: "java",
+      moduleSlug: pyApi.moduleSlug,
+    });
+  }
+
+  // Python ORM classes -> entities.
+  for (const c of result.classes) {
+    if (c.ormType === "none") continue;
+    acc.entityDefs.push({
+      name: c.name,
+      table: c.tableName ?? c.name,
+      moduleSlug: c.moduleSlug,
+      filePath: c.filePath,
+      fields: c.fields.map((f) => ({ name: f.name, type: f.type })),
+      source: "sql",
+    });
+  }
+
+  for (const m of result.methods) {
+    acc.callNodes.push({
+      id: m.id,
+      kind: "method",
+      name: m.className ? `${m.className}.${m.name}` : m.name,
+      filePath: m.filePath,
+      moduleSlug: m.moduleSlug,
+      signature: m.signature,
+    });
+  }
+  for (const e of result.callEdges) {
+    acc.callEdges.push({
+      from: e.source,
+      to: e.target,
+      kind: "calls",
+      confidence: "high",
+    });
+  }
+}
+
+/**
+ * TS repo: scanFrontend discovers packages, then the frontend call-graph
+ * registry plugin runs scoped to this repo root.
+ */
+async function scanWorkspaceTsRepo(
+  repo: WorkspaceRepo,
+  repoRoot: string,
+  config: ArchConfig,
+  acc: WorkspaceAccumulator
+): Promise<void> {
+  if (!config.scanners.frontend) return;
+
+  const repoPackages = await scanFrontend(repoRoot, repo.slug);
+  acc.packages.push(...repoPackages);
+  for (const pkg of repoPackages) {
+    acc.packageDirs.set(pkg.slug, repoRoot);
+  }
+
+  const registry = createScannerRegistry();
+  const ctx: ScannerContext = {
+    projectRoot: repoRoot,
+    modules: [],
+    model: { modules: [], apis: [], rpcs: [], packages: repoPackages },
+    repoLang: "ts",
+    repoSlug: repo.slug,
+    packageDirs: acc.packageDirs,
+    packages: repoPackages,
+  };
+  for (const plugin of registry) {
+    if (plugin.phase !== "call-graph") continue;
+    try {
+      const result = await plugin.scan(ctx);
+      if (result.callGraph?.nodes && result.callGraph.nodes.length > 0) {
+        acc.callNodes.push(...result.callGraph.nodes);
+        acc.callEdges.push(...result.callGraph.edges);
+      }
+    } catch (e) {
+      archLog.warn(`start-init: ${plugin.name} failed (non-fatal)`, {
+        repo: repo.slug,
+        error: e instanceof Error ? e.message : String(e),
+      });
+    }
+  }
+}
+
 export async function runStartInit(
   projectRoot: string,
   deps: PipelineDeps = {},
@@ -416,6 +863,18 @@ export async function runStartInit(
   resolveApiKey(config, "embedding");
   resolveApiKey(config, "chunking");
 
+  // v2.1.0: workspace mode -- when apt-workspace.json is present, scan every
+  // listed repo and merge results. Single-repo mode below is unchanged.
+  const workspaceConfig = await loadWorkspace(projectRoot);
+  if (workspaceConfig) {
+    return await runWorkspaceInit(
+      projectRoot,
+      workspaceConfig,
+      config,
+      deps,
+      options
+    );
+  }
   const previousScan = await readLastScan(projectRoot);
   let incremental = !options.full && previousScan !== null;
   let affectedModules = new Set<string>();
