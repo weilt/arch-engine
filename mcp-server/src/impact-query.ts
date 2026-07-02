@@ -29,10 +29,20 @@ export interface ImpactResult {
   note?: string;
   // v2.0.5 call-graph layer (all optional; omitted when call-graph.json is
   // missing/corrupt or when nothing matches).
-  dto?: { fields: { name: string; type: string }[]; usedBy: string[] };
-  method?: { callers: string[]; callees: string[]; annotations: string[] };
-  component?: { importers: string[]; imports: string[]; templateUsers: string[] };
-  graphReferences?: string[];
+ dto?: { fields: { name: string; type: string }[]; usedBy: string[] };
+ method?: { callers: string[]; callees: string[]; annotations: string[] };
+ component?: { importers: string[]; imports: string[]; templateUsers: string[] };
+ graphReferences?: string[];
+  // v2.1.0 workspace: call-graph edges whose endpoints live in different
+  // repos, surfaced so change-scoping can flag multi-repo impact. Omitted
+  // when the call graph is missing/corrupt or no edge spans two repos
+  // (single-repo graphs look identical to v2.0.6).
+  crossRepoEdges?: {
+    source: string;
+    target: string;
+    sourceRepo?: string;
+    targetRepo?: string;
+  }[];
 }
 
 // Canonical layer ordering, deepest-first so impact reads bottom-up:
@@ -167,6 +177,86 @@ function collectGraphReferences(
     }
   }
   return refs;
+}
+
+// ---------------------------------------------------------------------------
+// v2.1.0 cross-repo helpers.
+//
+// query_impact is workspace-aware: when the indexed call graph spans multiple
+// repos, any edge crossing a repo boundary is annotated so callers can tell
+// that a change ripples across repos. Repo attribution comes from three
+// signals, in priority order, because the typed CallGraphNode has no repoSlug
+// but a workspace run may emit one in the JSON:
+//   1. an explicit `repoSlug` field on the node,
+//   2. a repo/module `moduleSlug` like "order-service/orders",
+//   3. a repo/module prefix embedded in the id like "method:repo/module#name".
+// Plain single-repo nodes resolve to undefined, so detection stays silent and
+// backward compatible.
+// ---------------------------------------------------------------------------
+
+function repoOf(node: CallGraphNode | undefined): string | undefined {
+  if (!node || typeof node.id !== "string") return undefined;
+  const loose = node as { repoSlug?: string; moduleSlug?: string };
+  if (typeof loose.repoSlug === "string" && loose.repoSlug !== "") {
+    return loose.repoSlug;
+  }
+  const moduleSlug = loose.moduleSlug;
+  if (typeof moduleSlug === "string" && moduleSlug.includes("/")) {
+    const repo = moduleSlug.split("/")[0];
+    if (repo) return repo;
+  }
+  const colon = node.id.indexOf(":");
+  const rest = colon !== -1 ? node.id.slice(colon + 1) : node.id;
+  if (rest.includes("/")) {
+    const repo = rest.split("/")[0];
+    if (repo) return repo;
+  }
+  return undefined;
+}
+
+// Scan call-graph edges for ones whose endpoints resolve to different repos.
+// Both endpoints must carry a repo slug; an unknown repo on either side is
+// "cannot tell" rather than a cross-repo signal, which avoids false positives
+// on the legacy single-repo graphs emitted before v2.1.0.
+function detectCrossRepoEdges(
+  nodes: CallGraphNode[],
+  edges: CallGraphEdge[]
+): {
+  source: string;
+  target: string;
+  sourceRepo?: string;
+  targetRepo?: string;
+}[] {
+  const byId = new Map<string, CallGraphNode>();
+  for (const n of nodes) {
+    if (n && typeof n.id === "string") byId.set(n.id, n);
+  }
+  const cross: {
+    source: string;
+    target: string;
+    sourceRepo?: string;
+    targetRepo?: string;
+  }[] = [];
+  for (const edge of edges) {
+    if (
+      !edge ||
+      typeof edge.from !== "string" ||
+      typeof edge.to !== "string"
+    ) {
+      continue;
+    }
+    const sourceRepo = repoOf(byId.get(edge.from));
+    const targetRepo = repoOf(byId.get(edge.to));
+    if (sourceRepo && targetRepo && sourceRepo !== targetRepo) {
+      cross.push({
+        source: edge.from,
+        target: edge.to,
+        sourceRepo,
+        targetRepo,
+      });
+    }
+  }
+  return cross;
 }
 
 export async function handleQueryImpact(
@@ -312,5 +402,14 @@ export async function handleQueryImpact(
     const graphReferences = collectGraphReferences(entity, cgNodes);
     if (graphReferences.length > 0) result.graphReferences = graphReferences;
   }
+
+  // --- v2.1.0 cross-repo layer ----------------------------------------------
+  // Fault-tolerant like the call-graph read above: a missing/corrupt call
+  // graph leaves cgEdges empty, so detection yields nothing and the field is
+  // omitted. Single-repo graphs resolve every node to the same repo (or no
+  // repo), so no edge qualifies and the output is identical to v2.0.6.
+  const crossRepoEdges = detectCrossRepoEdges(cgNodes, cgEdges);
+  if (crossRepoEdges.length > 0) result.crossRepoEdges = crossRepoEdges;
+
   return result;
 }
