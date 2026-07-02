@@ -41,15 +41,15 @@ function emptyModel(): DocumentModel {
 }
 
 describe("createScannerRegistry", () => {
-  it("returns 6 plugins: 3 entity-phase + 1 flow-phase + 2 call-graph-phase", () => {
+  it("returns 8 plugins: 5 entity-phase + 1 flow-phase + 2 call-graph-phase", () => {
     const registry = createScannerRegistry();
 
-    expect(registry).toHaveLength(6);
+    expect(registry).toHaveLength(8);
 
     const entityPlugins = registry.filter((p) => p.phase === "entity");
     const flowPlugins = registry.filter((p) => p.phase === "flow");
     const callGraphPlugins = registry.filter((p) => p.phase === "call-graph");
-    expect(entityPlugins).toHaveLength(3);
+    expect(entityPlugins).toHaveLength(5);
     expect(flowPlugins).toHaveLength(1);
     expect(callGraphPlugins).toHaveLength(2);
 
@@ -61,6 +61,8 @@ describe("createScannerRegistry", () => {
       "entity-mybatis",
       "entity-sql",
       "flow-derive",
+      "go-scanner",
+      "python-scanner",
     ]);
   });
 
