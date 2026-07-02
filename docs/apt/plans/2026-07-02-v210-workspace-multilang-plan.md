@@ -2,7 +2,7 @@
 
 > **Spec:** docs/superpowers/specs/2026-07-02-v210-workspace-multilang-design.md
 > **Command:** /plan-from-spec
-> **Status:** draft
+> **Status:** approved
 
 **Goal:** 让 APT 从单仓库 Java + 前端升级为多仓库、多语言（Java + Go + Python + 前端）架构。
 

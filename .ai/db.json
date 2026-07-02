@@ -125,6 +125,36 @@
       "description": "v2.0.5 Ontology topology metrics: moduleCount, rpcEndpoints, entityCount, flowEdgeCount, crossServiceRefs, methodCount, dtoCount, callEdgeCount, importEdgeCount.",
       "tsFilePath": "mcp-server/src/ontology/types.ts",
       "registeredAt": "2026-06-30T14:38:45.359Z"
+    },
+    {
+      "name": "WorkspaceConfig",
+      "description": "Workspace configuration loaded from apt-workspace.json. Contains array of repos, each with path/lang/stack/name/slug. Drives multi-root pipeline scanning for cross-repo projects.",
+      "tsFilePath": "arch-engine/src/types.ts",
+      "registeredAt": "2026-07-02T04:41:13.447Z"
+    },
+    {
+      "name": "scanGoSources",
+      "description": "Go language full scanner. Extracts modules (go.mod), HTTP APIs (gin/echo/chi/net-http), gRPC endpoints (.proto), struct entities, and function-level call graph from Go source code via regex. Used in workspace mode for repos with lang=go.",
+      "tsFilePath": "arch-engine/src/scanners/go-scanner.ts",
+      "registeredAt": "2026-07-02T04:41:13.539Z"
+    },
+    {
+      "name": "scanPythonSources",
+      "description": "Python language full scanner. Extracts modules (pyproject.toml/setup.py), HTTP APIs (FastAPI/Flask/Django/Tornado), gRPC endpoints (.proto), ORM/Pydantic/Django entities, and indentation-aware function call graph from Python source code. Used in workspace mode for repos with lang=python.",
+      "tsFilePath": "arch-engine/src/scanners/python-scanner.ts",
+      "registeredAt": "2026-07-02T04:41:13.618Z"
+    },
+    {
+      "name": "scanProtoServices",
+      "description": "Shared .proto file parser. Globs for *.proto files, extracts service definitions and rpc methods (name, requestType, responseType). Shared between Go and Python scanners for gRPC endpoint discovery.",
+      "tsFilePath": "arch-engine/src/scanners/proto-scanner.ts",
+      "registeredAt": "2026-07-02T04:41:13.694Z"
+    },
+    {
+      "name": "loadWorkspace",
+      "description": "Workspace manifest loader and initializer. loadWorkspace reads apt-workspace.json (returns null if absent for single-repo compat). initWorkspace auto-scans subdirectories for marker files (pom.xml/go.mod/pyproject.toml/package.json) to generate the manifest. slugFromRepoPath and resolveRepoRoot are utility helpers.",
+      "tsFilePath": "arch-engine/src/workspace.ts",
+      "registeredAt": "2026-07-02T04:41:13.764Z"
     }
   ],
   "missingRequests": []

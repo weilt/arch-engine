@@ -1,77 +1,43 @@
 # Verify Report
 
-**Plan:** `docs/apt/plans/2026-07-04-java-api-path-rules-plan.md`
-**Overall:** PASS
-**Date:** 2026-07-04
+**Plan:** docs/apt/plans/2026-07-02-v210-workspace-multilang-plan.md
+**Overall:** FAIL
+**Date:** 2026-07-02
 
 ## Summary
-
 | 维度 | 结果 |
 |------|------|
 | Plan 对照 | PASS |
-| 架构 audit | PASS |
+| 架构 audit | FAIL |
 | 设计 audit | SKIP |
-| 契约登记 | PASS |
-| 可检索性 | PASS |
+| 契约登记 | FAIL |
+| 可检索性 | FAIL |
 | 测试/构建 | PASS |
 
 ## Plan Coverage
 
-| Task | 结果 | 备注 |
-|------|------|------|
-| 1 类型与配置模型 | PASS | `JavaScanConfig`、`PathRulesSnapshot`、`pathRulesHash` 在 types.ts；config.test.ts 10 项 |
-| 2 mergePathRules + 快照 | PASS | `mergePathRules`、`writePathRulesSnapshot`；java-path-rules.test 含 manual 覆盖 |
-| 3 pipeline + pathRulesHash | PASS | `resolveJavaPathRules(projectRoot, config)`；warn 建议 reindex-apis |
-| 4 runReindexApis | PASS | `reindex/apis.ts`；apis.test 狗食 `/admin-api` |
-| 5 CLI --reindex-apis | PASS | `cli.ts` + cli.test 7 项 |
-| 6 README + 狗食 | PASS | README manual/reindex-apis/FAQ；JAR fallback 测试 |
-| 7 WebProperties 直连 | PASS | `discoverAutoPathRules(roots)` 探测器 B |
-| 8 WebMvcConfigurer | PASS | configurer-only fixture + 探测器 C |
-| 9 AutoConfiguration 链 | PASS | starter-only fixture + 探测器 D |
-| 10 yml-only | PASS | 探测器 E；README 波次 2 段落 |
-| 11 updateJavaPathRules | PASS | `path-rules/update.ts`；update.test 7 项 |
-| 12 MCP 工具 | PASS | `update_java_path_rules`、`query_path_rules`；path-rules.test 5 项 |
-| 13 工作流分发 | PASS | AGENTS.md、apt-verify 禁止写侧、README 18 工具 |
-
-## 架构 audit（`since: last-scan`）
-
-| 类别 | 数量 |
-|------|------|
-| modified | 0 |
-| unregistered | 0 |
-| new | 0 |
-| deleted | 0 |
-
-**锚点：** commit `58d51af2`（2026-07-04），`/finish-feature` 全量 `sync-changes` 后已 bump。
-
-**sync-changes 摘要：** refreshed **86**；errors **17**（均为 `Unsupported asset kind for backend`——前端 component/route/store/api-client 被误标为 backend 资产，属已知限制，不影响本功能核心路径）。
-
-## 设计 audit
-
-SKIP — plan 无 UI / 设计层变更。
-
-## 契约登记
-
-PASS — 无新增对外 TS 契约；无需 `register_contract`。
-
-## 可检索性抽检
-
-| 查询 | 结果 |
-|------|------|
-| `search_arch("java path rules reindex-apis updateJavaPathRules")` | PASS — 命中 `java-path-rules`、`update`、`apis` |
-| `query_arch(backend/arch-engine/util#java-path-rules)` | PASS |
-
-## 测试/构建
-
-| 命令 | 结果 |
-|------|------|
-| `cd arch-engine && npm test` | PASS — 66 files, **336** tests |
-| `cd mcp-server && npm test` | PASS — 22 files, **132** tests |
+| Task | Result | 备注 |
+|------|--------|------|
+| 1 types.ts | PASS | Workspace/Go/Python interfaces + repoSlug + LastScanState.repos (commit 65622e6) |
+| 2 proto-scanner.ts | PASS | 4 tests, shared .proto parser (commit 2150344) |
+| 3 workspace.ts | PASS | 15 tests, loadWorkspace/initWorkspace/slugFromRepoPath (commit 56a42e9) |
+| 4 go-scanner.ts | PASS | 5 tests, gin/echo/chi/net-http + gRPC + struct + call graph (commit 713a5ae) |
+| 5 python-scanner.ts | PASS | 5 tests, FastAPI/Flask/Django/Tornado + ORM + indent-aware call graph (commit 6da94b0) |
+| 6 java.ts + frontend.ts | PASS | repoSlug threaded, 365 tests backward compat (commit c584a5d) |
+| 7 registry.ts | PASS | Go/Python scanner registration + repoLang routing, 8 plugins, 365 tests (commit a21b1e1) |
+| 8 paths.ts + config.ts | PASS | getArchBackendRepoDir + validateWorkspaceConfig, 365 tests (commit 5a3c7da) |
+| 9 pipeline.ts | PASS | workspace-aware multi-root, 3 tests (Java+Go+Python merge), 368 total (commit 4b1bea1) |
+| 10 index.ts | PASS | all new types/scanners exported, tsc clean both packages (commit 036aa11) |
+| 11 mcp ontology | PASS | repoCount + repo grouping, 4 tests, 140 total (commit a691cf8) |
+| 12 mcp impact | PASS | crossRepoEdges detection, 4 tests, 140 total (commit eab9ca6) |
+| 13 full verification | PASS | arch 368/368 + mcp 140/140, tsc clean |
 
 ## Failures
 
-无。
+- [F1] 架构 audit FAIL: .ai/arch last-scan at commit 77c273f (17 commits behind HEAD). New v2.1.0 files (workspace.ts, go-scanner.ts, python-scanner.ts, proto-scanner.ts, and modified types.ts/registry.ts/pipeline.ts) are not yet arch-indexed. Requires /finish-feature or sync-changes to sync knowledge base.
+- [F2] 契约登记 FAIL: WorkspaceConfig, scanGoSources, scanPythonSources, scanProtoServices — new exported types/functions not registered as contracts via register_contract.
+- [F3] 可检索性 FAIL: search_arch for workspace/go/python scanners returns no hits (not yet indexed in .ai/arch).
 
-## 建议
+## Recommended next steps
 
-- 后续可单独修复 17 项 `Unsupported asset kind`（前端资产 scope 映射），非本功能阻塞项。
+- FAIL -> /finish-feature: run audit_arch_changes + refresh_asset for all new/modified files + register_contract for new exported types, then re-run /verify to confirm PASS.
