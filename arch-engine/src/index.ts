@@ -28,18 +28,33 @@ export type {
   CallGraphEdgeKind,
 } from "./types.js";
 
+export type {
+  WorkspaceRepo,
+  WorkspaceConfig,
+  GoModule,
+  GoStruct,
+  GoApiEndpoint,
+  GoMethodNode,
+  PythonModule,
+  PythonClass,
+  PythonApiEndpoint,
+  PythonMethodNode,
+} from "./types.js";
+
 export {
   getArchDir,
   getArchConfigPath,
   getArchIndexPath,
   getArchIndexMdPath,
   getVectorsDbPath,
+  getArchBackendRepoDir,
 } from "./paths.js";
 
 export {
   DEFAULT_CONFIG,
   loadOrInitConfig,
   resolveApiKey,
+  validateWorkspaceConfig,
 } from "./config.js";
 
 export { parseOpenApiFile, scanOpenApiGlobs } from "./scanners/openapi.js";
@@ -57,6 +72,20 @@ export { mergeEntityGraphs } from "./scanners/entity-merge.js";
 export { deriveFlowGraph } from "./scanners/flow-scanner.js";
 export { scanCallGraphJava } from "./scanners/call-graph-java.js";
 export { scanCallGraphFrontend } from "./scanners/call-graph-frontend.js";
+
+export {
+  loadWorkspace,
+  initWorkspace,
+  slugFromRepoPath,
+  resolveRepoRoot,
+} from "./workspace.js";
+
+export { scanProtoServices } from "./scanners/proto-scanner.js";
+export type { ProtoService, ProtoRpcMethod } from "./scanners/proto-scanner.js";
+export { scanGoSources } from "./scanners/go-scanner.js";
+export type { GoScanResult } from "./scanners/go-scanner.js";
+export { scanPythonSources } from "./scanners/python-scanner.js";
+export type { PythonScanResult } from "./scanners/python-scanner.js";
 
 export {
   writeMarkdownTree,
