@@ -58,6 +58,7 @@ export interface FrontendPackage {
   apiClients?: ApiClientContract[];
   routes?: RouteEntry[];
   stores?: StoreContract[];
+  repoSlug?: string;
 }
 
 export interface ApiClientContract {
@@ -89,6 +90,7 @@ export interface JavaModule {
   slug: string;
   name: string;
   path: string;
+  repoSlug?: string;
 }
 
 export interface DocumentModel {
@@ -104,6 +106,8 @@ export interface DocumentModel {
   flows?: FlowGraph;
   /** Call graph (method/dto) for v2.0.5 call layer. */
   callGraph?: CallGraph;
+  /** Cross-repo workspace config (v2.1.0). */
+  workspace?: WorkspaceConfig;
 }
 
 export interface EntityField {
@@ -325,6 +329,8 @@ export interface LastScanState {
   packages: Record<string, LastScanModuleEntry>;
   /** Stable hash of path-rules.json content for incremental reindex detection. */
   pathRulesHash?: string;
+  /** Per-repo commit/branch snapshot for multi-repo workspace (v2.1.0). */
+  repos?: Record<string, { commit: string; branch: string; scannedAt: string }>;
 }
 
 export interface ArchConfig {
@@ -373,4 +379,89 @@ export interface ArchConfig {
   /** Optional Java scanner settings (path-rules discovery, manual prefixes). */
   java?: JavaScanConfig;
   scanners: { java: boolean; frontend: boolean };
+}
+
+export interface WorkspaceRepo {
+  path: string;
+  lang: "java" | "go" | "python" | "ts";
+  stack?: string;
+  name?: string;
+  slug: string;
+}
+
+export interface WorkspaceConfig {
+  repos: WorkspaceRepo[];
+}
+
+export interface GoModule {
+  slug: string;
+  name: string;
+  path: string;
+  repoSlug: string;
+}
+
+export interface GoStruct {
+  name: string;
+  fields: { name: string; type: string; tag?: string }[];
+  filePath: string;
+  moduleSlug: string;
+  repoSlug: string;
+}
+
+export interface GoApiEndpoint {
+  id: string;
+  method: string;
+  path: string;
+  handlerFunc: string;
+  framework: "gin" | "echo" | "chi" | "net-http" | "grpc";
+  moduleSlug: string;
+  repoSlug: string;
+}
+
+export interface GoMethodNode {
+  id: string;
+  receiver: string;
+  name: string;
+  signature: string;
+  filePath: string;
+  moduleSlug: string;
+  repoSlug: string;
+}
+
+export interface PythonModule {
+  slug: string;
+  name: string;
+  path: string;
+  repoSlug: string;
+}
+
+export interface PythonClass {
+  name: string;
+  baseClass?: string;
+  ormType: "pydantic" | "sqlalchemy" | "django" | "none";
+  fields: { name: string; type: string; annotation?: string }[];
+  tableName?: string;
+  filePath: string;
+  moduleSlug: string;
+  repoSlug: string;
+}
+
+export interface PythonApiEndpoint {
+  id: string;
+  method: string;
+  path: string;
+  handlerFunc: string;
+  framework: "fastapi" | "flask" | "django" | "tornado" | "grpc";
+  moduleSlug: string;
+  repoSlug: string;
+}
+
+export interface PythonMethodNode {
+  id: string;
+  className?: string;
+  name: string;
+  signature: string;
+  filePath: string;
+  moduleSlug: string;
+  repoSlug: string;
 }
