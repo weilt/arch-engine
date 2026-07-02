@@ -30,8 +30,11 @@ import {
   getDesignProfilePath,
   getFrameworkBindingsPath,
   getArchDir,
+  loadWorkspace,
+  loadArchIndex,
   type SearchHit,
   type EntityRelation,
+  type ArchIndex,
 } from "@apt/arch-engine";
 
 const PROGRESS_REL = path.join(".apt", "orchestration", "progress.md");
@@ -103,11 +106,40 @@ async function querySnapshot(
   // progress: only emitted when the task ledger has real entries.
   const progress = await deriveProgress(projectRoot, st?.tasks);
 
-  let modules: ModuleOntology[] = [];
+ let modules: ModuleOntology[] = [];
+ try {
+   modules = await listArchModules(projectRoot);
+ } catch {
+   modules = [];
+ }
+
+  // v2.1.0: enrich each module with repoSlug from the arch-index node, then
+  // group modules by repoSlug so same-repo entries are adjacent in the output.
+  // Both steps are best-effort: any failure leaves modules untouched.
   try {
-    modules = await listArchModules(projectRoot);
+    const index: ArchIndex = await loadArchIndex(projectRoot);
+    let hasRepo = false;
+    for (const mod of modules) {
+      const rawNode = index.nodes[`backend/${mod.slug}`] as
+        | (ArchIndex["nodes"][string] & { repoSlug?: unknown })
+        | undefined;
+      if (rawNode && typeof rawNode.repoSlug === "string" && rawNode.repoSlug.length > 0) {
+        mod.repoSlug = rawNode.repoSlug;
+        hasRepo = true;
+      }
+    }
+    if (hasRepo) {
+      // Stable group sort: by repoSlug then by slug (modules without a repoSlug
+      // sort last with an empty-string key).
+      modules.sort((a, b) => {
+        const ra = a.repoSlug ?? "";
+        const rb = b.repoSlug ?? "";
+        if (ra !== rb) return ra < rb ? -1 : 1;
+        return a.slug < b.slug ? -1 : 1;
+      });
+    }
   } catch {
-    modules = [];
+    // arch-index unreadable: repoSlug left unset, original order preserved.
   }
 
   let packages: PackageOntology[] = [];
@@ -255,7 +287,7 @@ async function deriveTopology(
       // call-graph.json missing or corrupt: all call-graph counts stay 0.
     }
 
-    return {
+    const topology: OntologyTopology = {
       moduleCount,
       rpcEndpoints,
       entityCount,
@@ -266,6 +298,26 @@ async function deriveTopology(
       callEdgeCount,
       importEdgeCount,
     };
+
+    // v2.1.0: repoCount from apt-workspace.json manifest. When no manifest is
+    // present (single-repo mode), fall back to distinct module repoSlugs from
+    // the arch-index. Omitted entirely when neither source yields a count.
+    try {
+      const workspace = await loadWorkspace(projectRoot);
+      if (workspace && workspace.repos.length > 0) {
+        topology.repoCount = workspace.repos.length;
+      } else {
+        const distinctRepos = new Set<string>();
+        for (const m of modules) {
+          if (m.repoSlug) distinctRepos.add(m.repoSlug);
+        }
+        if (distinctRepos.size > 0) topology.repoCount = distinctRepos.size;
+      }
+    } catch {
+      // workspace manifest missing/corrupt and no module repoSlugs: omit.
+    }
+
+    return topology;
   } catch {
     // Overall failure: omit topology entirely.
     return undefined;

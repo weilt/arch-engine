@@ -37,6 +37,8 @@ export interface ModuleOntology {
   slug: string;
   name: string;
   assetCounts: OntologyAssetCount;
+  // v2.1.0: workspace repo this module belongs to (set in multi-repo mode).
+  repoSlug?: string;
 }
 
 // Ontology view of a single frontend package.
@@ -94,6 +96,9 @@ export interface OntologyTopology {
   dtoCount?: number;
   callEdgeCount?: number;
   importEdgeCount?: number;
+
+  // v2.1.0: number of repos in an apt-workspace.json manifest (multi-repo).
+  repoCount?: number;
 }
 
 // Full project ontology snapshot (spec section 3.2).
