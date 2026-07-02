@@ -21,3 +21,7 @@ export function getVectorsDbPath(projectRoot: string): string {
 export function getLastScanPath(projectRoot: string): string {
   return path.join(getArchDir(projectRoot), "last-scan.json");
 }
+
+export function getArchBackendRepoDir(projectRoot: string, repoSlug: string): string {
+  return path.join(getArchDir(projectRoot), "backend", repoSlug);
+}

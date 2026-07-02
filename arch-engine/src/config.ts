@@ -1,6 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
-import type { ArchConfig } from "./types.js";
+import type { ArchConfig, WorkspaceConfig } from "./types.js";
 import { getArchConfigPath, getArchSecretsPath } from "./paths.js";
 
 export const DEFAULT_CONFIG: ArchConfig = {
@@ -134,4 +134,30 @@ export function resolveApiKey(
     );
   }
   return key;
+}
+
+export function validateWorkspaceConfig(config: WorkspaceConfig): string[] {
+  const errors: string[] = [];
+  if (!config.repos || !Array.isArray(config.repos)) {
+    errors.push("apt-workspace.json: missing or invalid 'repos' array");
+    return errors;
+  }
+  if (config.repos.length === 0) {
+    errors.push("apt-workspace.json: 'repos' array is empty");
+  }
+  const validLangs = ["java", "go", "python", "ts"];
+  const seenSlugs = new Set<string>();
+  for (const repo of config.repos) {
+    if (!repo.path) {
+      errors.push("apt-workspace.json: repo missing 'path' field");
+    }
+    if (!repo.lang || !validLangs.includes(repo.lang)) {
+      errors.push(`apt-workspace.json: repo '${repo.path}' has invalid lang '${repo.lang}'`);
+    }
+    if (repo.slug && seenSlugs.has(repo.slug)) {
+      errors.push(`apt-workspace.json: duplicate repo slug '${repo.slug}'`);
+    }
+    if (repo.slug) seenSlugs.add(repo.slug);
+  }
+  return errors;
 }
